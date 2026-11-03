@@ -1,0 +1,1223 @@
+openapi: 3.1.0
+info:
+  title: SellerDesk API
+  description: 'Рабочее место оператора продавца на маркетплейсах: единая лента чатов,
+    отзывы и вопросы, AI-черновики и шаблоны ответов. Демо: площадки и LLM — заглушки.'
+  version: 0.3.2
+paths:
+  /api/health:
+    get:
+      tags:
+      - service
+      summary: Health
+      operationId: health_api_health_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthOut'
+  /api/auth/login:
+    post:
+      tags:
+      - auth
+      summary: Login
+      operationId: login_api_auth_login_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginIn'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenOut'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/auth/me:
+    get:
+      tags:
+      - auth
+      summary: Me
+      operationId: me_api_auth_me_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperatorOut'
+      security:
+      - HTTPBearer: []
+  /api/chats:
+    get:
+      tags:
+      - chats
+      summary: List Chats
+      description: Единая лента чатов всех площадок, свежие сверху. Сортировка по
+        UTC-времени (BUG-02).
+      operationId: list_chats_api_chats_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: marketplace
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - enum:
+            - wildberries
+            - ozon
+            - yandex_market
+            type: string
+          - type: 'null'
+          title: Marketplace
+      - name: status
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - enum:
+            - new
+            - in_progress
+            - answered
+            type: string
+          - type: 'null'
+          title: Status
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 200
+          minimum: 1
+          default: 50
+          title: Limit
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+          title: Offset
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatList'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/chats/{chat_id}:
+    get:
+      tags:
+      - chats
+      summary: Get Chat
+      operationId: get_chat_api_chats__chat_id__get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: chat_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Chat Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatOut'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Not Found
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/chats/{chat_id}/reply:
+    post:
+      tags:
+      - chats
+      summary: Reply To Chat
+      operationId: reply_to_chat_api_chats__chat_id__reply_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: chat_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Chat Id
+      - name: Idempotency-Key
+        in: header
+        required: true
+        schema:
+          type: string
+          minLength: 8
+          maxLength: 64
+          description: Один ключ на одно намерение ответить. Повтор с тем же ключом
+            не отправит второй ответ.
+          title: Idempotency-Key
+        description: Один ключ на одно намерение ответить. Повтор с тем же ключом
+          не отправит второй ответ.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReplyIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReplyOut'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Not Found
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Conflict
+        '502':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Bad Gateway
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/chats/{chat_id}/ai-draft:
+    post:
+      tags:
+      - chats
+      summary: Chat Ai Draft
+      description: Черновик от LLM-провайдера. Сохраняется в карточке, покупателю
+        не уходит.
+      operationId: chat_ai_draft_api_chats__chat_id__ai_draft_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: chat_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Chat Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DraftOut'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Not Found
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/chats/{chat_id}/template-reply:
+    post:
+      tags:
+      - chats
+      summary: Chat Template Reply
+      description: Автоответ по шаблону. Если переменная не подставилась — не отправляет,
+        а кладёт черновик с причиной.
+      operationId: chat_template_reply_api_chats__chat_id__template_reply_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: chat_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Chat Id
+      - name: Idempotency-Key
+        in: header
+        required: true
+        schema:
+          type: string
+          minLength: 8
+          maxLength: 64
+          description: Один ключ на одно намерение ответить. Повтор с тем же ключом
+            не отправит второй ответ.
+          title: Idempotency-Key
+        description: Один ключ на одно намерение ответить. Повтор с тем же ключом
+          не отправит второй ответ.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TemplateReplyIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TemplateReplyOut'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Not Found
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Conflict
+        '502':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Bad Gateway
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/feedback:
+    get:
+      tags:
+      - feedback
+      summary: List Feedback
+      operationId: list_feedback_api_feedback_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: kind
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            pattern: ^(review|question)$
+          - type: 'null'
+          title: Kind
+      - name: marketplace
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - enum:
+            - wildberries
+            - ozon
+            - yandex_market
+            type: string
+          - type: 'null'
+          title: Marketplace
+      - name: rating
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+            maximum: 5
+            minimum: 1
+          - type: 'null'
+          title: Rating
+      - name: answered
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Answered
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 200
+          minimum: 1
+          default: 50
+          title: Limit
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+          title: Offset
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeedbackList'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/feedback/{feedback_id}/answer:
+    post:
+      tags:
+      - feedback
+      summary: Answer Feedback
+      operationId: answer_feedback_api_feedback__feedback_id__answer_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: feedback_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Feedback Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReplyIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeedbackOut'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Not Found
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Conflict
+        '502':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Bad Gateway
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/feedback/{feedback_id}/ai-draft:
+    post:
+      tags:
+      - feedback
+      summary: Feedback Ai Draft
+      operationId: feedback_ai_draft_api_feedback__feedback_id__ai_draft_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: feedback_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Feedback Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DraftOut'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Not Found
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/feedback/{feedback_id}/template-reply:
+    post:
+      tags:
+      - feedback
+      summary: Feedback Template Reply
+      operationId: feedback_template_reply_api_feedback__feedback_id__template_reply_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: feedback_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Feedback Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TemplateReplyIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TemplateReplyOut'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Not Found
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Conflict
+        '502':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Bad Gateway
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/templates:
+    get:
+      tags:
+      - templates
+      summary: List Templates
+      operationId: list_templates_api_templates_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/TemplateOut'
+                type: array
+                title: Response List Templates Api Templates Get
+      security:
+      - HTTPBearer: []
+    post:
+      tags:
+      - templates
+      summary: Create Template
+      operationId: create_template_api_templates_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TemplateIn'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TemplateOut'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
+  /api/sync:
+    post:
+      tags:
+      - sync
+      summary: Start Sync
+      description: Ставит задачу синхронизации и сразу отвечает. Площадку не ждём
+        — интерфейс читает из БД.
+      operationId: start_sync_api_sync_post
+      responses:
+        '202':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncJobOut'
+        '200':
+          description: Задача уже в очереди или идёт — возвращается она же
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncJobOut'
+      security:
+      - HTTPBearer: []
+  /api/sync/latest:
+    get:
+      tags:
+      - sync
+      summary: Latest Sync
+      operationId: latest_sync_api_sync_latest_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/SyncJobOut'
+                - type: 'null'
+                title: Response Latest Sync Api Sync Latest Get
+      security:
+      - HTTPBearer: []
+  /api/sync/{job_id}:
+    get:
+      tags:
+      - sync
+      summary: Get Sync
+      operationId: get_sync_api_sync__job_id__get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: job_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Job Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncJobOut'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Not Found
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+components:
+  schemas:
+    ChatList:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/ChatListItem'
+          type: array
+          title: Items
+        total:
+          type: integer
+          title: Total
+      type: object
+      required:
+      - items
+      - total
+      title: ChatList
+    ChatListItem:
+      properties:
+        id:
+          type: integer
+          title: Id
+        marketplace:
+          type: string
+          enum:
+          - wildberries
+          - ozon
+          - yandex_market
+          title: Marketplace
+        buyer_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Buyer Name
+        product_title:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Product Title
+        order_number:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Order Number
+        status:
+          type: string
+          enum:
+          - new
+          - in_progress
+          - answered
+          title: Status
+        last_message_at:
+          type: string
+          format: date-time
+          title: Last Message At
+        last_message_preview:
+          type: string
+          title: Last Message Preview
+      type: object
+      required:
+      - id
+      - marketplace
+      - buyer_name
+      - product_title
+      - order_number
+      - status
+      - last_message_at
+      - last_message_preview
+      title: ChatListItem
+    ChatOut:
+      properties:
+        id:
+          type: integer
+          title: Id
+        marketplace:
+          type: string
+          enum:
+          - wildberries
+          - ozon
+          - yandex_market
+          title: Marketplace
+        external_id:
+          type: string
+          title: External Id
+        buyer_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Buyer Name
+        product_sku:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Product Sku
+        product_title:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Product Title
+        order_number:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Order Number
+        status:
+          type: string
+          enum:
+          - new
+          - in_progress
+          - answered
+          title: Status
+        last_message_at:
+          type: string
+          format: date-time
+          title: Last Message At
+        draft_text:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Draft Text
+        draft_note:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Draft Note
+        messages:
+          items:
+            $ref: '#/components/schemas/MessageOut'
+          type: array
+          title: Messages
+      type: object
+      required:
+      - id
+      - marketplace
+      - external_id
+      - buyer_name
+      - product_sku
+      - product_title
+      - order_number
+      - status
+      - last_message_at
+      - draft_text
+      - draft_note
+      - messages
+      title: ChatOut
+    DraftOut:
+      properties:
+        text:
+          type: string
+          title: Text
+        provider:
+          type: string
+          title: Provider
+        note:
+          type: string
+          title: Note
+          default: Черновик не отправлен. Проверьте и отправьте сами.
+      type: object
+      required:
+      - text
+      - provider
+      title: DraftOut
+    ErrorOut:
+      properties:
+        detail:
+          type: string
+          title: Detail
+      type: object
+      required:
+      - detail
+      title: ErrorOut
+    FeedbackList:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/FeedbackOut'
+          type: array
+          title: Items
+        total:
+          type: integer
+          title: Total
+      type: object
+      required:
+      - items
+      - total
+      title: FeedbackList
+    FeedbackOut:
+      properties:
+        id:
+          type: integer
+          title: Id
+        marketplace:
+          type: string
+          enum:
+          - wildberries
+          - ozon
+          - yandex_market
+          title: Marketplace
+        kind:
+          type: string
+          enum:
+          - review
+          - question
+          title: Kind
+        product_title:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Product Title
+        buyer_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Buyer Name
+        rating:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Rating
+        text:
+          type: string
+          title: Text
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        answer_text:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Answer Text
+        answered_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Answered At
+        draft_text:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Draft Text
+        draft_note:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Draft Note
+      type: object
+      required:
+      - id
+      - marketplace
+      - kind
+      - product_title
+      - buyer_name
+      - rating
+      - text
+      - created_at
+      - answer_text
+      - answered_at
+      - draft_text
+      - draft_note
+      title: FeedbackOut
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          type: array
+          title: Detail
+      type: object
+      title: HTTPValidationError
+    HealthOut:
+      properties:
+        status:
+          type: string
+          const: ok
+          title: Status
+        database:
+          type: string
+          const: ok
+          title: Database
+      type: object
+      required:
+      - status
+      - database
+      title: HealthOut
+    LoginIn:
+      properties:
+        login:
+          type: string
+          maxLength: 64
+          minLength: 1
+          title: Login
+        password:
+          type: string
+          maxLength: 256
+          minLength: 1
+          title: Password
+      type: object
+      required:
+      - login
+      - password
+      title: LoginIn
+    MessageOut:
+      properties:
+        id:
+          type: integer
+          title: Id
+        author:
+          type: string
+          enum:
+          - buyer
+          - operator
+          title: Author
+        text:
+          type: string
+          title: Text
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+      type: object
+      required:
+      - id
+      - author
+      - text
+      - created_at
+      title: MessageOut
+    OperatorOut:
+      properties:
+        id:
+          type: integer
+          title: Id
+        login:
+          type: string
+          title: Login
+        display_name:
+          type: string
+          title: Display Name
+      type: object
+      required:
+      - id
+      - login
+      - display_name
+      title: OperatorOut
+    ReplyIn:
+      properties:
+        text:
+          type: string
+          maxLength: 2000
+          minLength: 1
+          title: Text
+      type: object
+      required:
+      - text
+      title: ReplyIn
+    ReplyOut:
+      properties:
+        message:
+          $ref: '#/components/schemas/MessageOut'
+        duplicate:
+          type: boolean
+          title: Duplicate
+          description: true — запрос с этим Idempotency-Key уже был, повторно не отправлено
+      type: object
+      required:
+      - message
+      - duplicate
+      title: ReplyOut
+    SyncJobOut:
+      properties:
+        id:
+          type: integer
+          title: Id
+        status:
+          type: string
+          enum:
+          - queued
+          - running
+          - done
+          - failed
+          title: Status
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        started_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Started At
+        finished_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Finished At
+        chats_upserted:
+          type: integer
+          title: Chats Upserted
+        messages_inserted:
+          type: integer
+          title: Messages Inserted
+        feedback_upserted:
+          type: integer
+          title: Feedback Upserted
+        error:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Error
+      type: object
+      required:
+      - id
+      - status
+      - created_at
+      - started_at
+      - finished_at
+      - chats_upserted
+      - messages_inserted
+      - feedback_upserted
+      - error
+      title: SyncJobOut
+    TemplateIn:
+      properties:
+        name:
+          type: string
+          maxLength: 128
+          minLength: 1
+          title: Name
+        body:
+          type: string
+          maxLength: 2000
+          minLength: 1
+          title: Body
+      type: object
+      required:
+      - name
+      - body
+      title: TemplateIn
+    TemplateOut:
+      properties:
+        id:
+          type: integer
+          title: Id
+        name:
+          type: string
+          title: Name
+        body:
+          type: string
+          title: Body
+        variables:
+          items:
+            type: string
+          type: array
+          title: Variables
+      type: object
+      required:
+      - id
+      - name
+      - body
+      - variables
+      title: TemplateOut
+    TemplateReplyIn:
+      properties:
+        template_id:
+          type: integer
+          title: Template Id
+      type: object
+      required:
+      - template_id
+      title: TemplateReplyIn
+    TemplateReplyOut:
+      properties:
+        sent:
+          type: boolean
+          title: Sent
+        text:
+          type: string
+          title: Text
+        missing:
+          items:
+            type: string
+          type: array
+          title: Missing
+        note:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Note
+      type: object
+      required:
+      - sent
+      - text
+      - missing
+      - note
+      title: TemplateReplyOut
+    TokenOut:
+      properties:
+        access_token:
+          type: string
+          title: Access Token
+        token_type:
+          type: string
+          const: bearer
+          title: Token Type
+          default: bearer
+        operator:
+          $ref: '#/components/schemas/OperatorOut'
+      type: object
+      required:
+      - access_token
+      - operator
+      title: TokenOut
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+          type: array
+          title: Location
+        msg:
+          type: string
+          title: Message
+        type:
+          type: string
+          title: Error Type
+        input:
+          title: Input
+        ctx:
+          type: object
+          title: Context
+      type: object
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError
+  securitySchemes:
+    HTTPBearer:
+      type: http
+      scheme: bearer
