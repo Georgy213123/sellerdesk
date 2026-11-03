@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="Definitions_AsIs" targetNamespace="https://example.org/sellerdesk/bpmn" exporter="handwritten" exporterVersion="1.0">
+  <bpmn:collaboration id="Collab_AsIs">
+    <bpmn:participant id="Pool_AsIs" name="Обработка обращения покупателя — как есть" processRef="Process_AsIs" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_AsIs" isExecutable="false">
+    <bpmn:laneSet id="LaneSet_AsIs">
+      <bpmn:lane id="Lane_buyer" name="Покупатель">
+        <bpmn:flowNodeRef>Start</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_mp" name="Площадка (кабинет)">
+        <bpmn:flowNodeRef>Store</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Deliver</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_op" name="Оператор">
+        <bpmn:flowNodeRef>Open</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>GwNew</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Next</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Find</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Edit</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Send</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="Start" name="Покупатель написал">
+      <bpmn:outgoing>F1</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:serviceTask id="Store" name="Сохранить обращение в кабинете">
+      <bpmn:incoming>F1</bpmn:incoming>
+      <bpmn:outgoing>F2</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:userTask id="Open" name="Открыть кабинет площадки и дождаться загрузки">
+      <bpmn:incoming>F2</bpmn:incoming>
+      <bpmn:incoming>F5</bpmn:incoming>
+      <bpmn:outgoing>F3</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="GwNew" name="Есть новые обращения?">
+      <bpmn:incoming>F3</bpmn:incoming>
+      <bpmn:outgoing>F4</bpmn:outgoing>
+      <bpmn:outgoing>F6</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="Next" name="Перейти к следующему кабинету">
+      <bpmn:incoming>F4</bpmn:incoming>
+      <bpmn:outgoing>F5</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="Find" name="Найти похожий ответ в заметках">
+      <bpmn:incoming>F6</bpmn:incoming>
+      <bpmn:outgoing>F7</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="Edit" name="Поправить имя и товар вручную">
+      <bpmn:incoming>F7</bpmn:incoming>
+      <bpmn:outgoing>F8</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="Send" name="Отправить ответ в кабинете">
+      <bpmn:incoming>F8</bpmn:incoming>
+      <bpmn:outgoing>F9</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:serviceTask id="Deliver" name="Доставить ответ покупателю">
+      <bpmn:incoming>F9</bpmn:incoming>
+      <bpmn:outgoing>F10</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="End" name="Покупатель получил ответ">
+      <bpmn:incoming>F10</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="F1" sourceRef="Start" targetRef="Store" />
+    <bpmn:sequenceFlow id="F2" sourceRef="Store" targetRef="Open" />
+    <bpmn:sequenceFlow id="F3" sourceRef="Open" targetRef="GwNew" />
+    <bpmn:sequenceFlow id="F4" name="нет" sourceRef="GwNew" targetRef="Next" />
+    <bpmn:sequenceFlow id="F5" sourceRef="Next" targetRef="Open" />
+    <bpmn:sequenceFlow id="F6" name="да" sourceRef="GwNew" targetRef="Find" />
+    <bpmn:sequenceFlow id="F7" sourceRef="Find" targetRef="Edit" />
+    <bpmn:sequenceFlow id="F8" sourceRef="Edit" targetRef="Send" />
+    <bpmn:sequenceFlow id="F9" sourceRef="Send" targetRef="Deliver" />
+    <bpmn:sequenceFlow id="F10" sourceRef="Deliver" targetRef="End" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="Diagram_AsIs">
+    <bpmndi:BPMNPlane id="Plane_AsIs" bpmnElement="Collab_AsIs">
+      <bpmndi:BPMNShape id="Pool_AsIs_di" bpmnElement="Pool_AsIs" isHorizontal="true">
+        <dc:Bounds x="160" y="80" width="1790" height="450" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_buyer_di" bpmnElement="Lane_buyer" isHorizontal="true">
+        <dc:Bounds x="190" y="80" width="1760" height="150" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_mp_di" bpmnElement="Lane_mp" isHorizontal="true">
+        <dc:Bounds x="190" y="230" width="1760" height="150" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_op_di" bpmnElement="Lane_op" isHorizontal="true">
+        <dc:Bounds x="190" y="380" width="1760" height="150" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Start_di" bpmnElement="Start">
+        <dc:Bounds x="232" y="137" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Store_di" bpmnElement="Store">
+        <dc:Bounds x="360" y="265" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Open_di" bpmnElement="Open">
+        <dc:Bounds x="530" y="415" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="GwNew_di" bpmnElement="GwNew" isMarkerVisible="true">
+        <dc:Bounds x="735" y="430" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Next_di" bpmnElement="Next">
+        <dc:Bounds x="870" y="415" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Find_di" bpmnElement="Find">
+        <dc:Bounds x="1040" y="415" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Edit_di" bpmnElement="Edit">
+        <dc:Bounds x="1210" y="415" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Send_di" bpmnElement="Send">
+        <dc:Bounds x="1380" y="415" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Deliver_di" bpmnElement="Deliver">
+        <dc:Bounds x="1550" y="265" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_di" bpmnElement="End">
+        <dc:Bounds x="1762" y="137" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="F1_di" bpmnElement="F1">
+        <di:waypoint x="268" y="155" />
+        <di:waypoint x="314" y="155" />
+        <di:waypoint x="314" y="305" />
+        <di:waypoint x="360" y="305" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F2_di" bpmnElement="F2">
+        <di:waypoint x="480" y="305" />
+        <di:waypoint x="505" y="305" />
+        <di:waypoint x="505" y="455" />
+        <di:waypoint x="530" y="455" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F3_di" bpmnElement="F3">
+        <di:waypoint x="650" y="455" />
+        <di:waypoint x="735" y="455" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F4_di" bpmnElement="F4">
+        <di:waypoint x="785" y="455" />
+        <di:waypoint x="870" y="455" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F5_di" bpmnElement="F5">
+        <di:waypoint x="930" y="495" />
+        <di:waypoint x="930" y="520" />
+        <di:waypoint x="590" y="520" />
+        <di:waypoint x="590" y="495" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F6_di" bpmnElement="F6">
+        <di:waypoint x="785" y="455" />
+        <di:waypoint x="1040" y="455" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F7_di" bpmnElement="F7">
+        <di:waypoint x="1160" y="455" />
+        <di:waypoint x="1210" y="455" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F8_di" bpmnElement="F8">
+        <di:waypoint x="1330" y="455" />
+        <di:waypoint x="1380" y="455" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F9_di" bpmnElement="F9">
+        <di:waypoint x="1500" y="455" />
+        <di:waypoint x="1525" y="455" />
+        <di:waypoint x="1525" y="305" />
+        <di:waypoint x="1550" y="305" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F10_di" bpmnElement="F10">
+        <di:waypoint x="1670" y="305" />
+        <di:waypoint x="1716" y="305" />
+        <di:waypoint x="1716" y="155" />
+        <di:waypoint x="1762" y="155" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>
