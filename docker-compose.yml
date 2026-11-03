@@ -1,0 +1,50 @@
+name: sellerdesk
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: sellerdesk
+      POSTGRES_PASSWORD: sellerdesk
+      POSTGRES_DB: sellerdesk
+    ports:
+      - "127.0.0.1:55101:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sellerdesk -d sellerdesk"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql+psycopg://sellerdesk:sellerdesk@postgres:5432/sellerdesk
+      JWT_SECRET: ${JWT_SECRET:-demo-only-change-me-0123456789abcdef}
+      DEMO_OPERATOR_PASSWORD: ${DEMO_OPERATOR_PASSWORD:-demo-password}
+      MARKETPLACE_MODE: mock
+      MOCK_MARKETPLACE_DELAY_MS: ${MOCK_MARKETPLACE_DELAY_MS:-800}
+      CORS_ORIGINS: http://localhost:5101
+    ports:
+      - "127.0.0.1:8101:8101"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8101/api/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 15s
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "127.0.0.1:5101:8080"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  pgdata:
