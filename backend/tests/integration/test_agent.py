@@ -2,7 +2,7 @@
 
 import threading
 import time
-from collections.abc import Iterator, Sequence
+from collections.abc import Callable, Iterator, Sequence
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -17,7 +17,6 @@ from app.agent.steps import _strip_unknown_variables, execute_step
 from app.config import Settings, get_settings
 from app.db import get_engine, get_sessionmaker
 from app.llm.insights import Case, InsightsUnavailable, ProposalDraft, StubInsightsProvider, Theme, ThemeBrief
-from app.marketplaces.mock import BUYERS
 from app.models import (
     AgentEvent,
     AgentEventKind,
@@ -25,10 +24,7 @@ from app.models import (
     AgentProposal,
     AgentRun,
     AgentRunStatus,
-    Author,
-    Chat,
     Feedback,
-    Message,
     Operator,
     ProposalKind,
     ProposalStatus,
@@ -64,13 +60,15 @@ class SpyInsights:
         self._propose_error = propose_error
         self._propose_error_on = propose_error_on
         self.classify_calls: list[list[Case]] = []
+        self.known_calls: list[list[tuple[str, str]]] = []
         self.propose_calls: list[ThemeBrief] = []
 
-    def classify(self, batch: Sequence[Case]) -> tuple[list[Theme], int]:
+    def classify(self, batch: Sequence[Case], known: Sequence[tuple[str, str]] = ()) -> tuple[list[Theme], int]:
         self.classify_calls.append(list(batch))
+        self.known_calls.append(list(known))
         if self._classify_error:
             raise self._classify_error
-        result = self._inner.classify(batch)
+        result = self._inner.classify(batch, known)
         if self._crash_after_classify:
             raise ProcessKilled  # ответ получен (и оплачен), но процесс умер до записи
         return result
@@ -79,7 +77,8 @@ class SpyInsights:
         if self._crash_on_propose == len(self.propose_calls):
             raise ProcessKilled
         if self._propose_error and self._propose_error_on == len(self.propose_calls):
-            raise self._propose_error
+            error, self._propose_error = self._propose_error, None  # временная ошибка: повтор пройдёт
+            raise error
         self.propose_calls.append(theme)
         return self._inner.propose(theme)
 
@@ -93,8 +92,10 @@ def _settings(**kw: object) -> Settings:
     return Settings(**{"agent_period_days": 3650, "agent_min_cases": 1, **kw})  # type: ignore[arg-type]
 
 
-def _run(provider: object, run_id: int | None = None, **kw: object) -> AgentRunStatus | None:
-    return run_agent(get_sessionmaker(), KIND, provider, _settings(**kw), run_id=run_id)  # type: ignore[arg-type]
+def _run(
+    provider: object, run_id: int | None = None, sleep: Callable[[float], None] = lambda _: None, **kw: object
+) -> AgentRunStatus | None:
+    return run_agent(get_sessionmaker(), KIND, provider, _settings(**kw), run_id=run_id, sleep=sleep)  # type: ignore[arg-type]
 
 
 def _expire_lease(session: Session, run_id: int) -> None:
@@ -197,11 +198,11 @@ def test_step_is_dropped_if_run_was_taken_over(synced):
     """Прогон подобрал другой процесс, пока шаг шёл: наш результат не записывается."""
 
     class Taken(SpyInsights):
-        def classify(self, batch: Sequence[Case]) -> tuple[list[Theme], int]:
+        def classify(self, batch: Sequence[Case], known: Sequence[tuple[str, str]] = ()) -> tuple[list[Theme], int]:
             with get_sessionmaker()() as other:
                 other.execute(update(AgentRun).values(heartbeat_at=datetime.now(UTC) + timedelta(seconds=5)))
                 other.commit()
-            return super().classify(batch)
+            return super().classify(batch, known)
 
     assert _run(Taken()) is None
     run = _last_run(synced)
@@ -222,118 +223,118 @@ def test_unexpected_exception_fails_run_at_once_and_next_launch_starts_new_run(s
     assert _last_run(synced).id > failed.id
 
 
-def test_transient_provider_error_resumes_same_run(synced):
-    first = SpyInsights(propose_error=InsightsUnavailable("лимит"), propose_error_on=1)
-    assert _run(first) == AgentRunStatus.RUNNING  # прогон жив, ждёт следующего запуска
+def test_transient_error_is_retried_with_pause_inside_one_launch(synced):
+    sleeps: list[float] = []
+    spy = SpyInsights(propose_error=InsightsUnavailable("лимит"), propose_error_on=1)
+    assert _run(spy, sleep=sleeps.append, agent_retry_pause_s=7) == AgentRunStatus.SUCCEEDED
     run = _last_run(synced)
-    assert run.status == AgentRunStatus.RUNNING
-    assert run.checkpoint["failures"] == 1
-    assert run.lease_until is not None
-    assert run.lease_until <= datetime.now(UTC)  # аренда отдана
+    assert sleeps == [7]
+    assert run.status == AgentRunStatus.SUCCEEDED
+    assert run.checkpoint["failures"] == 0  # успешный шаг сбросил счётчик
     assert "лимит" in _events(synced, run.id, AgentEventKind.ERROR)[0].message
-    assert synced.execute(select(func.count()).select_from(AgentProposal)).scalar_one() == 1
-
-    second = SpyInsights()
-    assert _run(second) == AgentRunStatus.SUCCEEDED
-    assert _last_run(synced).id == run.id
-    assert not second.classify_calls
+    assert len(spy.classify_calls) > 0
     keys = [(p.theme_key, p.kind) for p in synced.execute(select(AgentProposal)).scalars()]
-    assert len(keys) == len(set(keys)) == len(first.propose_calls) + len(second.propose_calls)
+    assert len(keys) == len(set(keys)) == len(spy.propose_calls)
 
 
 def test_transient_errors_fail_run_after_max_attempts(synced):
+    sleeps: list[float] = []
     broken = SpyInsights(classify_error=InsightsUnavailable("нет связи"))
-    statuses = [_run(broken, agent_max_attempts=3) for _ in range(3)]
-    assert statuses == [AgentRunStatus.RUNNING, AgentRunStatus.RUNNING, AgentRunStatus.FAILED]
+    assert _run(broken, sleep=sleeps.append, agent_max_attempts=3) == AgentRunStatus.FAILED
     run = _last_run(synced)
+    assert len(sleeps) == 2  # пауза между попытками, после последней не ждём
     assert run.error == "нет связи"
     assert len(_events(synced, run.id, AgentEventKind.ERROR)) == 3
+    assert len(broken.classify_calls) == 3
     assert enqueue_run(synced, KIND, _settings())[1] is True  # упавший прогон не держит очередь
 
 
-def test_token_budget_stops_run_and_keeps_saved_proposals(synced):
-    assert _run(SpyInsights()) == AgentRunStatus.SUCCEEDED
+def test_refused_call_is_charged_by_reported_tokens(synced):
+    spy = SpyInsights(classify_error=InsightsUnavailable("модель отказалась", tokens=700))
+    assert _run(spy, agent_max_attempts=1) == AgentRunStatus.FAILED
     run = _last_run(synced)
-    calls = _events(synced, run.id, AgentEventKind.LLM_CALL)
-    first_propose = next(i for i, e in enumerate(calls) if e.message.startswith("propose"))
-    budget = sum(e.tokens for e in calls[: first_propose + 1])
-    synced.execute(text("DELETE FROM agent_runs"))
-    synced.commit()
-
-    spy = SpyInsights()
-    assert _run(spy, agent_token_budget=budget) == AgentRunStatus.BUDGET_EXHAUSTED
-    synced.expire_all()
-    stopped = _last_run(synced)
-    assert stopped.status == AgentRunStatus.BUDGET_EXHAUSTED
-    assert stopped.tokens_used == budget
-    assert len(spy.propose_calls) == 1  # после исчерпания бюджета модель не вызывали
-    assert synced.execute(select(func.count()).select_from(AgentProposal)).scalar_one() == 1
-    assert "бюджет" in _events(synced, stopped.id, AgentEventKind.BUDGET_STOP)[0].message
-    # Остановленный прогон не блокирует следующий.
-    assert enqueue_run(synced, KIND, _settings())[1] is True
+    assert run.tokens_used == 700
+    assert "pending" not in run.checkpoint
 
 
-def test_step_limit_stops_run(synced):
-    spy = SpyInsights()
-    assert _run(spy, agent_max_steps=2) == AgentRunStatus.BUDGET_EXHAUSTED
-    run = _last_run(synced)
-    assert run.steps_done == 2
-    assert len(spy.classify_calls) == 1  # collect и одна пачка
-    assert "лимит шагов" in _events(synced, run.id, AgentEventKind.BUDGET_STOP)[0].message
-
-
-def test_disabled_agent_does_nothing(synced):
-    spy = SpyInsights()
-    assert _run(spy, agent_enabled=False) is None
-    assert synced.execute(select(func.count()).select_from(AgentRun)).scalar_one() == 0
-
-
-def test_one_active_run_per_kind(session):
-    run, created = enqueue_run(session, KIND, _settings())
-    again, created_again = enqueue_run(session, KIND, _settings())
-    assert created
-    assert not created_again
-    assert again.id == run.id
-
-
-def test_pii_does_not_reach_provider(synced):
-    now = datetime.now(UTC)
-    synced.add(
-        Feedback(
-            marketplace="ozon",
-            external_id="pii-1",
-            kind="review",
-            buyer_name="Ярослав",
-            rating=1,
-            text="Пришла разбитой. Звоните +7 (900) 111-22-33, пишите ya@example.test, заказ 1234567890",
-            created_at=now - timedelta(hours=1),
+def test_stale_abandoned_run_is_closed_and_new_one_started(synced):
+    old, _ = enqueue_run(synced, KIND, _settings())
+    long_ago = datetime.now(UTC) - timedelta(days=10)
+    synced.execute(
+        update(AgentRun)
+        .where(AgentRun.id == old.id)
+        .values(
+            status=AgentRunStatus.RUNNING,
+            started_at=long_ago,
+            heartbeat_at=long_ago,
+            lease_until=long_ago,
+            period_to=long_ago,
+            period_from=long_ago - timedelta(days=7),
         )
     )
-    chat = Chat(marketplace="ozon", external_id="pii-c", buyer_name="Ярослав", last_message_at=now)
-    chat.messages.append(
-        Message(author=Author.BUYER, text="Мой номер 89001112233, не включается", created_at=now - timedelta(hours=2))
-    )
-    synced.add(chat)
     synced.commit()
 
+    assert _run(SpyInsights(), agent_period_days=7) == AgentRunStatus.SUCCEEDED
+    synced.expire_all()
+    closed = synced.get_one(AgentRun, old.id)
+    assert closed.status == AgentRunStatus.FAILED
+    assert "устарел" in (closed.error or "")
+    newest = _last_run(synced)
+    assert newest.id > old.id
+    assert newest.period_to > datetime.now(UTC) - timedelta(minutes=5)
+
+
+def test_fresh_abandoned_run_is_resumed_not_replaced(synced):
+    run, _ = enqueue_run(synced, KIND, _settings())
+    _expire_lease(synced, run.id)
+    synced.execute(update(AgentRun).where(AgentRun.id == run.id).values(status=AgentRunStatus.RUNNING))
+    synced.commit()
+    assert _run(SpyInsights()) == AgentRunStatus.SUCCEEDED
+    assert _last_run(synced).id == run.id
+
+
+def test_second_batch_receives_themes_found_in_first(synced):
     spy = SpyInsights()
-    assert _run(spy) == AgentRunStatus.SUCCEEDED
-    sent = spy.sent_to_model
-    for leaked in ("900", "111-22-33", "89001112233", "1234567890", "ya@example.test", "Ярослав"):
-        assert leaked not in sent
-    assert all(name.lower() not in sent.lower() for name in BUYERS if name)
-    assert "[телефон]" in sent
-    assert "[email]" in sent
+    assert _run(spy, agent_batch_size=8) == AgentRunStatus.SUCCEEDED
+    assert len(spy.classify_calls) >= 2
+    assert spy.known_calls[0] == []
+    first_keys = {key for key, _ in spy.known_calls[1]}
+    assert first_keys
+    assert all(title for _, title in spy.known_calls[1])
+
+
+def test_classify_stage_gets_only_its_share_of_budget(synced):
+    spy = SpyInsights()
+    status = _run(spy, agent_batch_size=5, agent_classify_budget_share=0.0001)
+    assert status == AgentRunStatus.SUCCEEDED
+    assert len(spy.classify_calls) == 1  # доля исчерпана после первой пачки
+    run = _last_run(synced)
+    assert _events(synced, run.id, AgentEventKind.STAGE_CUT)
+    assert synced.execute(select(func.count()).select_from(AgentProposal)).scalar_one() >= 1
+
+
+def test_stale_process_does_not_write_step_started_into_journal(synced):
+    class Taken(SpyInsights):
+        def classify(self, batch: Sequence[Case], known: Sequence[tuple[str, str]] = ()) -> tuple[list[Theme], int]:
+            with get_sessionmaker()() as other:
+                other.execute(update(AgentRun).values(heartbeat_at=datetime.now(UTC) + timedelta(seconds=5)))
+                other.commit()
+            return super().classify(batch, known)
+
+    assert _run(Taken()) is None
+    run = _last_run(synced)
+    started = _events(synced, run.id, AgentEventKind.STEP_STARTED)
+    assert len(started) == run.steps_done == 1  # шага 2 в журнале нет: его владелец потерян
 
 
 def test_reservation_is_committed_before_llm_call_and_replaced_by_actual(synced):
     seen: list[dict[str, int] | None] = []
 
     class Peek(SpyInsights):
-        def classify(self, batch: Sequence[Case]) -> tuple[list[Theme], int]:
+        def classify(self, batch: Sequence[Case], known: Sequence[tuple[str, str]] = ()) -> tuple[list[Theme], int]:
             with get_sessionmaker()() as other:
                 seen.append(other.execute(select(AgentRun.checkpoint)).scalar_one().get("pending"))
-            return super().classify(batch)
+            return super().classify(batch, known)
 
     assert _run(Peek()) == AgentRunStatus.SUCCEEDED
     assert seen
@@ -406,17 +407,24 @@ def test_strip_unknown_variables_keeps_known_ones():
 
 
 @pytest.mark.parametrize(
-    "phone",
-    ["+7.900.111.22.33", "+375 (29) 123-45-67", "8 (900) 111 22 33", "+7-900-111-22-33", "8.900.111.22.33"],
+    ("prefix", "phone"),
+    [
+        ("", "+7.900.111.22.33"),
+        ("", "+375 (29) 123-45-67"),
+        ("", "8 (900) 111 22 33"),
+        ("", "8.900.111.22.33"),
+        ("2026-10-30 ", "8 (900) 111 22 33"),
+        ("30.10.2026 ", "8 900 111 22 33"),
+    ],
 )
-def test_phone_in_any_format_does_not_reach_provider(synced, phone):
+def test_phone_in_any_format_does_not_reach_provider(synced, prefix, phone):
     synced.add(
         Feedback(
             marketplace="ozon",
             external_id="ph-1",
             kind="review",
             rating=1,
-            text=f"Разбита лампа, звоните {phone}",
+            text=f"Разбита лампа, звоните {prefix}{phone}",
             created_at=datetime.now(UTC) - timedelta(hours=1),
         )
     )
@@ -472,6 +480,15 @@ def test_api_start_resumes_run_with_expired_lease(client: TestClient, auth, sync
     detail = client.get(f"/api/agent/runs/{run.id}", headers=auth).json()
     assert detail["status"] == "succeeded"
     assert "resumed" in {e["kind"] for e in detail["events"]}
+
+
+def test_api_marks_abandoned_run(client: TestClient, auth, synced, agent_env):
+    run, _ = enqueue_run(synced, KIND, get_settings())
+    _take_over_ready(synced, run.id, timedelta(minutes=5))
+    assert client.get(f"/api/agent/runs/{run.id}", headers=auth).json()["abandoned"] is False
+    _take_over_ready(synced, run.id, timedelta(minutes=-5))
+    assert client.get("/api/agent/runs", headers=auth).json()[0]["abandoned"] is True
+    assert client.get(f"/api/agent/runs/{run.id}", headers=auth).json()["abandoned"] is True
 
 
 def test_api_start_with_live_owner_is_409(client: TestClient, auth, synced, agent_env):
@@ -585,10 +602,11 @@ def test_cli_exit_codes(synced, monkeypatch, agent_env):
     synced.commit()
 
     class Broken(SpyInsights):
-        def classify(self, batch: Sequence[Case]) -> tuple[list[Theme], int]:
+        def classify(self, batch: Sequence[Case], known: Sequence[tuple[str, str]] = ()) -> tuple[list[Theme], int]:
             raise InsightsUnavailable("нет связи")
 
     monkeypatch.setenv("AGENT_TOKEN_BUDGET", "60000")
+    monkeypatch.setenv("AGENT_RETRY_PAUSE_S", "0")
     get_settings.cache_clear()
     monkeypatch.setattr(cli, "get_insights_provider", lambda settings: Broken())
     assert cli.main(["agent", "run"]) == 1

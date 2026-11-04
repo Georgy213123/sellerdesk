@@ -48,13 +48,17 @@ def start_run(session: SessionDep, _: OperatorDep, background: BackgroundTasks) 
         settings,
         run_id=run.id,
     )
-    return AgentRunOut.model_validate(run)
+    return _run_out(run)
+
+
+def _run_out(run: AgentRun) -> AgentRunOut:
+    return AgentRunOut.model_validate(run).model_copy(update={"abandoned": is_abandoned(run, get_settings())})
 
 
 @router.get("/runs", response_model=list[AgentRunOut])
 def list_runs(session: SessionDep, _: OperatorDep) -> list[AgentRunOut]:
     rows = session.execute(select(AgentRun).order_by(AgentRun.id.desc()).limit(RUNS_LIMIT)).scalars().all()
-    return [AgentRunOut.model_validate(r) for r in rows]
+    return [_run_out(r) for r in rows]
 
 
 @router.get("/runs/{run_id}", response_model=AgentRunDetailOut, responses={404: {"model": ErrorOut}})
@@ -62,7 +66,7 @@ def get_run(run_id: int, session: SessionDep, _: OperatorDep) -> AgentRunDetailO
     run = session.get(AgentRun, run_id)
     if run is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "прогон не найден")
-    return AgentRunDetailOut.model_validate(run)
+    return AgentRunDetailOut.model_validate(run).model_copy(update={"abandoned": is_abandoned(run, get_settings())})
 
 
 @router.get("/proposals", response_model=list[ProposalOut])

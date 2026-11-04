@@ -1,6 +1,9 @@
 [Unit]
 Description=SellerDesk: еженедельный разбор обращений (агент-маркетолог)
 After=network-online.target postgresql.service
+# Не больше трёх перезапусков за шесть часов: повторы нужны для сбоя, а не для зацикливания.
+StartLimitIntervalSec=6h
+StartLimitBurst=3
 
 [Service]
 Type=oneshot
@@ -12,3 +15,7 @@ ExecStart=/opt/sellerdesk/backend/.venv/bin/python -m app.cli agent run
 # Код 2 — бюджет исчерпан: сделанное сохранено, юнит не считается упавшим.
 SuccessExitStatus=2
 TimeoutStartSec=30min
+# Временные ошибки модели агент повторяет сам, внутри запуска. Перезапуск — подстраховка:
+# при коде 1 (прогон failed) следующий запуск ставит новый прогон за актуальный период.
+Restart=on-failure
+RestartSec=10min

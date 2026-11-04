@@ -26,6 +26,21 @@ services:
       MARKETPLACE_MODE: mock
       # У демо-данных фиксированные даты (конец октября 2026), поэтому окно разбора агента 90 дней, а не неделя.
       AGENT_PERIOD_DAYS: ${AGENT_PERIOD_DAYS:-90}
+      # Claude API включается в .env: LLM_PROVIDER=anthropic и ключ. Ключа по умолчанию нет.
+      LLM_PROVIDER: ${LLM_PROVIDER:-stub}
+      LLM_MODEL: ${LLM_MODEL:-claude-opus-5-5}
+      LLM_TIMEOUT_S: ${LLM_TIMEOUT_S:-20}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      AGENT_ENABLED: ${AGENT_ENABLED:-true}
+      AGENT_TOKEN_BUDGET: ${AGENT_TOKEN_BUDGET:-60000}
+      AGENT_MAX_STEPS: ${AGENT_MAX_STEPS:-40}
+      AGENT_LEASE_S: ${AGENT_LEASE_S:-120}
+      AGENT_MAX_ATTEMPTS: ${AGENT_MAX_ATTEMPTS:-3}
+      AGENT_RETRY_PAUSE_S: ${AGENT_RETRY_PAUSE_S:-60}
+      AGENT_CLASSIFY_BUDGET_SHARE: ${AGENT_CLASSIFY_BUDGET_SHARE:-0.7}
+      AGENT_BATCH_SIZE: ${AGENT_BATCH_SIZE:-20}
+      AGENT_TOP_THEMES: ${AGENT_TOP_THEMES:-3}
+      AGENT_MIN_CASES: ${AGENT_MIN_CASES:-2}
       MOCK_MARKETPLACE_DELAY_MS: ${MOCK_MARKETPLACE_DELAY_MS:-800}
       CORS_ORIGINS: http://localhost:5101
     ports:

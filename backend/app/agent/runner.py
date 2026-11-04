@@ -15,6 +15,8 @@
 
 import copy
 import logging
+import time
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -22,7 +24,7 @@ from sqlalchemy import and_, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.agent.steps import estimate_reserve, execute_step, initial_checkpoint, needs_llm
+from app.agent.steps import cut_classify, estimate_reserve, execute_step, initial_checkpoint, needs_llm
 from app.config import Settings
 from app.llm.insights import InsightsProvider, InsightsUnavailable
 from app.models import AgentEvent, AgentEventKind, AgentRun, AgentRunStatus
@@ -56,10 +58,31 @@ def enqueue_run(session: Session, kind: str, settings: Settings) -> tuple[AgentR
         active = session.execute(
             select(AgentRun).where(AgentRun.kind == kind, AgentRun.status.in_(ACTIVE))
         ).scalar_one_or_none()
+        if active is not None and _close_if_outdated(session, active, settings):
+            continue  # старый прогон закрыт, ставим новый за актуальный период
         session.commit()
         if active is not None:
             return active, False
     raise RuntimeError("не удалось поставить прогон агента: активные прогоны завершаются слишком часто")
+
+
+def _close_if_outdated(session: Session, run: AgentRun, settings: Settings) -> bool:
+    """Брошенный прогон, чей период закончился больше интервала назад, возобновлять незачем: он описал бы
+    старую неделю, а новая осталась бы без разбора. Закрываем как failed и даём место новому."""
+    age = datetime.now(UTC) - run.period_to
+    if not is_abandoned(run, settings) or age <= timedelta(days=settings.agent_period_days):
+        return False
+    reason = f"устарел: период закончился {age.days} дн. назад"
+    closed = session.execute(
+        update(AgentRun)
+        .where(AgentRun.id == run.id, AgentRun.status.in_(ACTIVE))
+        .values(status=AgentRunStatus.FAILED, finished_at=datetime.now(UTC), lease_until=None, error=reason)
+        .returning(AgentRun.id)
+    ).scalar_one_or_none()
+    if closed is not None:
+        _event(session, run.id, run.steps_done, AgentEventKind.ERROR, reason)
+    session.commit()
+    return True
 
 
 def is_abandoned(run: AgentRun, settings: Settings) -> bool:
@@ -124,15 +147,10 @@ def _close(
     return status
 
 
-def _save(
-    session: Session, run_id: int, owner: datetime, settings: Settings, release: bool = False, **values: Any
-) -> datetime | None:
-    """Фиксирует транзакцию, если прогон всё ещё наш. Возвращает новую метку heartbeat или None.
-
-    `release=True` отдаёт аренду сразу: следующий запуск подберёт прогон без ожидания.
-    """
+def _save(session: Session, run_id: int, owner: datetime, settings: Settings, **values: Any) -> datetime | None:
+    """Фиксирует транзакцию, если прогон всё ещё наш. Возвращает новую метку heartbeat или None."""
     now = datetime.now(UTC)
-    lease = now if release else now + timedelta(seconds=settings.agent_lease_s)
+    lease = now + timedelta(seconds=settings.agent_lease_s)
     saved = session.execute(
         update(AgentRun)
         .where(AgentRun.id == run_id, AgentRun.status == AgentRunStatus.RUNNING, AgentRun.heartbeat_at == owner)
@@ -177,19 +195,22 @@ def _reserve(
 
 
 def _transient_failure(
-    session: Session, run: AgentRun, owner: datetime, settings: Settings, step: int, exc: Exception
-) -> AgentRunStatus | None:
-    """Ошибка провайдера: прогон остаётся в прежнем чекпоинте. Резерв снимаем: ответа не было."""
+    session: Session, run: AgentRun, owner: datetime, settings: Settings, step: int, exc: InsightsUnavailable
+) -> datetime | AgentRunStatus | None:
+    """Ошибка провайдера: чекпоинт прежний, резерв снимаем, оплаченные токены (отказ модели) списываем.
+
+    Возвращает новую метку владельца, если стоит повторить, иначе итоговый статус.
+    """
     run = session.get_one(AgentRun, run.id, populate_existing=True)
     checkpoint = {k: v for k, v in run.checkpoint.items() if k != "pending"}
     checkpoint["failures"] = checkpoint.get("failures", 0) + 1
-    _event(session, run.id, step, AgentEventKind.ERROR, str(exc)[:500])
-    owner_ = _save(session, run.id, owner, settings, release=True, checkpoint=checkpoint)
-    if owner_ is None:
+    _event(session, run.id, step, AgentEventKind.ERROR, str(exc)[:500], exc.tokens)
+    saved = _save(session, run.id, owner, settings, checkpoint=checkpoint, tokens_used=run.tokens_used + exc.tokens)
+    if saved is None:
         return None
     if checkpoint["failures"] >= settings.agent_max_attempts:
-        return _close(session, run, owner_, AgentRunStatus.FAILED, str(exc)[:500])
-    return AgentRunStatus.RUNNING
+        return _close(session, run, saved, AgentRunStatus.FAILED, str(exc)[:500])
+    return saved
 
 
 def run_agent(
@@ -198,13 +219,15 @@ def run_agent(
     provider: InsightsProvider,
     settings: Settings,
     run_id: int | None = None,
+    sleep: Callable[[float], None] = time.sleep,
 ) -> AgentRunStatus | None:
     """Выполняет прогон и возвращает его статус на выходе из этого запуска.
 
     Без `run_id` берёт активный прогон вида `kind` или ставит новый (CLI, таймер). С `run_id`
     только захватывает этот прогон и никогда не создаёт другой (фоновая задача API).
     None — прогон не наш: агент выключен, прогон уже закончен или им владеет другой процесс.
-    RUNNING — временная ошибка провайдера: прогон ждёт следующего запуска.
+    Временную ошибку провайдера повторяет с паузой `agent_retry_pause_s` внутри этого запуска; наружу
+    она выходит статусом `failed` только после `agent_max_attempts` попыток подряд.
 
     Бюджет проверяется перед шагом, а перед вызовом LLM коммитится резерв; поэтому превышение
     бюджета ограничено одним резервом. `budget_exhausted` — не ошибка: сделанное сохранено.
@@ -240,9 +263,19 @@ def run_agent(
                 _event(session, run.id, run.steps_done, AgentEventKind.BUDGET_STOP, reason)
                 return _close(session, run, owner, AgentRunStatus.BUDGET_EXHAUSTED)
 
+            if (
+                run.checkpoint["stage"] == "classify"
+                and run.tokens_used >= settings.agent_classify_budget_share * run.token_budget
+            ):
+                message = f"классификация остановлена: израсходовано {run.tokens_used} токенов, доля бюджета исчерпана"
+                _event(session, run.id, run.steps_done, AgentEventKind.STAGE_CUT, message)
+                cut = _save(session, run.id, owner, settings, checkpoint=cut_classify(run.checkpoint, settings))
+                if cut is None:
+                    return None
+                owner = cut
+                continue
+
             step = run.steps_done + 1
-            _event(session, run.id, step, AgentEventKind.STEP_STARTED, f"стадия {run.checkpoint['stage']}")
-            session.commit()
             try:
                 if needs_llm(run.checkpoint):
                     reserved = _reserve(session, run, owner, provider, settings, step)
@@ -250,6 +283,8 @@ def run_agent(
                         return None
                     owner = reserved
                 result = execute_step(session, run, provider, settings)
+                # Журнал шага пишется в той же транзакции и под той же проверкой владельца, что и результат.
+                _event(session, run.id, step, AgentEventKind.STEP_STARTED, f"стадия {run.checkpoint['stage']}")
                 if result.llm_call:
                     _event(session, run.id, step, AgentEventKind.LLM_CALL, result.llm_call, result.tokens)
                 _event(session, run.id, step, AgentEventKind.STEP_DONE, result.message, result.tokens)
@@ -271,7 +306,11 @@ def run_agent(
             except InsightsUnavailable as exc:
                 session.rollback()
                 log.warning("прогон %s: шаг %s, провайдер недоступен: %s", run.id, step, exc)
-                return _transient_failure(session, run, owner, settings, step, exc)
+                outcome = _transient_failure(session, run, owner, settings, step, exc)
+                if not isinstance(outcome, datetime):
+                    return outcome
+                owner = outcome
+                sleep(settings.agent_retry_pause_s)
             except Exception as exc:
                 session.rollback()
                 log.exception("прогон %s: шаг %s упал", run.id, step)

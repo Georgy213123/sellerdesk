@@ -36,7 +36,11 @@ export function AgentPage({ onTemplateCreated }: { onTemplateCreated: () => Prom
     setProposals(p);
   }, []);
 
-  const active = runs[0]?.status === "queued" || runs[0]?.status === "running";
+  const latest = runs[0];
+  const active = latest?.status === "queued" || latest?.status === "running";
+  // Аренда истекла: владельца нет, опрашивать нечего, прогон надо подхватить.
+  const abandoned = active && latest.abandoned;
+  const polling = active && !abandoned;
 
   useEffect(() => {
     let alive = true;
@@ -51,7 +55,7 @@ export function AgentPage({ onTemplateCreated }: { onTemplateCreated: () => Prom
   }, []);
 
   useEffect(() => {
-    if (!active) return;
+    if (!polling) return;
     let alive = true;
     let timer: number | undefined;
     // Следующий опрос планируется после каждого запроса, в том числе неудачного.
@@ -66,7 +70,7 @@ export function AgentPage({ onTemplateCreated }: { onTemplateCreated: () => Prom
       alive = false;
       window.clearTimeout(timer);
     };
-  }, [active, load]);
+  }, [polling, load]);
 
   async function act(action: () => Promise<unknown>, after?: () => Promise<void>) {
     setError(null);
@@ -86,8 +90,8 @@ export function AgentPage({ onTemplateCreated }: { onTemplateCreated: () => Prom
           Раз в неделю агент разбирает отзывы, вопросы и чаты и находит повторяющиеся претензии. Сам
           ничего не публикует: предложения ждут вашего решения.
         </p>
-        <button type="button" disabled={active} onClick={() => void act(api.startAgentRun)}>
-          {active ? "Идёт разбор…" : "Запустить разбор"}
+        <button type="button" disabled={polling} onClick={() => void act(api.startAgentRun)}>
+          {abandoned ? "Продолжить разбор" : polling ? "Идёт разбор…" : "Запустить разбор"}
         </button>
       </div>
       {error && (
@@ -102,7 +106,7 @@ export function AgentPage({ onTemplateCreated }: { onTemplateCreated: () => Prom
         {runs.map((run) => (
           <li key={run.id} data-testid="agent-run" data-status={run.status}>
             <strong className={`run-${run.status}`}>
-              №{run.id}: {STATUS_LABEL[run.status]}
+              №{run.id}: {run.abandoned ? "прервался" : STATUS_LABEL[run.status]}
             </strong>
             <span>
               Период {formatTime(run.period_from)} – {formatTime(run.period_to)}

@@ -1,9 +1,9 @@
 # 05. Тестирование
 
 ```
-        e2e Playwright: 6 сценариев × 2 вьюпорта
-     интеграция pytest + PostgreSQL: 58
-  unit: pytest 60, Vitest 20
+        e2e Playwright: 7 сценариев × 2 вьюпорта
+     интеграция pytest + PostgreSQL: 101
+  unit: pytest 95, Vitest 30
 ```
 
 - **unit, бэкенд:** подстановка шаблонов, время в UTC, заглушки, провайдер Claude API на фейковом клиенте (без сети), JWT, сверка `openapi.yaml` с кодом.
@@ -21,7 +21,7 @@
 | US-04 Отзывы | `test_feedback_api.py`, `UserText.test.tsx`, e2e US-04, BUG-04 |
 | US-05 Шаблоны | `test_templating.py`, `test_templates_api.py`, `test_cr11_*`, Vitest CR-04, e2e US-05 |
 | US-06 Обновить | `test_sync.py`, `test_cr06/07_*`, `test_r2_*`, Vitest CR-08, CR-09, e2e US-06 |
-| FR-12, FR-13 Агент | `test_agent.py`, `test_agent_insights.py`, `test_pii.py`, `agent-page.test.tsx`, e2e агента |
+| FR-12, FR-13 Агент | `test_agent.py`, `test_agent_insights.py`, `test_pii.py`, `test_compose.py`, `agent-page.test.tsx`, e2e агента |
 | FR-09, NFR-04, NFR-05 | `test_security.py`, e2e NFR-04, `test_openapi_*`, `test_models_match_*` |
 
 ## Прогон 2026-11-04 (v0.5.0)
@@ -30,9 +30,9 @@ macOS, Python 3.12, Node 24, PostgreSQL 16, Playwright 1.64.
 
 | Набор | Результат | Время |
 |---|---|---|
-| pytest (`make test-backend`) | 185 passed | 23,8 с |
-| Vitest | 29 passed | ~2 с |
-| Playwright | 14 passed | 23,0 с |
+| pytest (`make test-backend`) | 196 passed | 24,2 с |
+| Vitest | 30 passed | ~2 с |
+| Playwright | 14 passed | 22,8 с |
 
-Покрытие бэкенда 95 %; ниже всего `app/cli.py` (56 %) и каркасы адаптеров (71 %).
+Покрытие бэкенда 94 %; ниже всего `app/cli.py` (56 %) и каркасы адаптеров (71 %).
 Тесты багов и находок ревью падали до исправления.

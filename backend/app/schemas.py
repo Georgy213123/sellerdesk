@@ -152,7 +152,7 @@ class AgentEventOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
     step: int
-    kind: Literal["step_started", "step_done", "llm_call", "budget_stop", "error", "resumed"]
+    kind: Literal["step_started", "step_done", "llm_call", "budget_stop", "stage_cut", "error", "resumed"]
     message: str
     tokens: int
     created_at: datetime
@@ -170,6 +170,7 @@ class AgentRunOut(BaseModel):
     tokens_used: int
     token_budget: int
     error: str | None
+    abandoned: bool = Field(False, description="Прогон активен, но у него нет живого владельца: аренда истекла")
     created_at: datetime
     started_at: datetime | None
     finished_at: datetime | None

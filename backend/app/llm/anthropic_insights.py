@@ -6,13 +6,14 @@ from typing import Any
 import anthropic
 
 from app.llm.anthropic_provider import failure_reason
-from app.llm.insights import Case, InsightsUnavailable, ProposalDraft, Theme, ThemeBrief
+from app.llm.insights import Case, InsightsUnavailable, KnownTheme, ProposalDraft, Theme, ThemeBrief
 from app.models import ProposalKind
 from app.templating import KNOWN_VARIABLES
 
 CLASSIFY_SYSTEM = (
     "Ты анализируешь обращения покупателей маркетплейса. Сгруппируй их по повторяющимся темам "
-    "претензий и вопросов. Ключ темы — латиницей в snake_case, для одной темы всегда один и тот же. "
+    "претензий и вопросов. Ключ темы — латиницей в snake_case, для одной темы всегда один и тот же: "
+    "если тема совпадает с уже найденной, возьми её ключ из списка. "
     "Обращения без повторяющейся темы пропусти. В refs указывай только ссылки из списка."
 )
 PROPOSE_SYSTEM = (
@@ -87,24 +88,31 @@ class AnthropicInsights:
         except anthropic.APIError as exc:
             raise InsightsUnavailable(failure_reason(exc)) from exc
 
+        # Вызов оплачен, даже если ответ непригоден: токены уходят в исключение, раннер их спишет.
+        tokens = response.usage.input_tokens + response.usage.output_tokens
         if response.stop_reason == "refusal":
-            raise InsightsUnavailable("модель отказалась")
+            raise InsightsUnavailable("модель отказалась", tokens)
         block = next(
             (b for b in response.content if getattr(b, "type", None) == "tool_use" and b.name == tool["name"]), None
         )
         if block is None or not isinstance(block.input, dict):
-            raise InsightsUnavailable("нет структурированного ответа")
-        return block.input, response.usage.input_tokens + response.usage.output_tokens
+            raise InsightsUnavailable("нет структурированного ответа", tokens)
+        return block.input, tokens
 
-    def classify(self, batch: Sequence[Case]) -> tuple[list[Theme], int]:
+    def classify(self, batch: Sequence[Case], known: Sequence[KnownTheme] = ()) -> tuple[list[Theme], int]:
         lines = [
             f"[{c.ref}] ({c.kind}{f', оценка {c.rating}' if c.rating is not None else ''}) {c.text}" for c in batch
         ]
-        data, tokens = self._call(CLASSIFY_SYSTEM, "\n".join(lines), CLASSIFY_TOOL)
+        content = "\n".join(lines)
+        if known:
+            content = (
+                "Уже найденные темы (ключ: название):\n" + "\n".join(f"{k}: {t}" for k, t in known) + "\n\n" + content
+            )
+        data, tokens = self._call(CLASSIFY_SYSTEM, content, CLASSIFY_TOOL)
         try:
             themes = [Theme(str(t["key"]), str(t["title"]), [str(r) for r in t["refs"]]) for t in data["themes"]]
         except (KeyError, TypeError) as exc:
-            raise InsightsUnavailable("неверный формат ответа") from exc
+            raise InsightsUnavailable("неверный формат ответа", tokens) from exc
         return themes, tokens
 
     def propose(self, theme: ThemeBrief) -> tuple[ProposalDraft, int]:
@@ -115,7 +123,7 @@ class AnthropicInsights:
         try:
             draft = ProposalDraft(str(data["kind"]), str(data["title"]), str(data["body"]))
         except KeyError as exc:
-            raise InsightsUnavailable("неверный формат ответа") from exc
+            raise InsightsUnavailable("неверный формат ответа", tokens) from exc
         if draft.kind not in {k.value for k in ProposalKind}:
-            raise InsightsUnavailable("неверный формат ответа")
+            raise InsightsUnavailable("неверный формат ответа", tokens)
         return draft, tokens

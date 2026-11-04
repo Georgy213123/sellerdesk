@@ -27,3 +27,8 @@ def test_phone_in_any_format_is_masked(phone):
 )
 def test_ordinary_numbers_are_kept(text):
     assert mask_pii(text) == text
+
+
+@pytest.mark.parametrize("date", ["2026-10-30", "30.10.2026", "30.10.26"])
+def test_date_before_phone_does_not_hide_phone(date):
+    assert mask_pii(f"было {date} 8 (900) 111 22 33") == f"было {date} [телефон]"

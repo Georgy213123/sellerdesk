@@ -115,3 +115,32 @@ def test_claude_sdk_errors_become_unavailable(error, reason):
     with pytest.raises(InsightsUnavailable) as info:
         AnthropicInsights(FakeClient(error=error)).propose(ThemeBrief("k", "т", 1, []))
     assert str(info.value) == reason
+
+
+def test_refusal_error_carries_paid_tokens():
+    client = FakeClient(_tool_use("report_themes", {"themes": []}, usage=(300, 40), stop="refusal"))
+    with pytest.raises(InsightsUnavailable) as info:
+        AnthropicInsights(client).classify([_case("feedback:1", "текст")])
+    assert info.value.tokens == 340
+
+
+def test_missing_tool_use_and_bad_format_carry_paid_tokens():
+    no_block = SimpleNamespace(
+        stop_reason="end_turn", content=[], usage=SimpleNamespace(input_tokens=50, output_tokens=5)
+    )
+    with pytest.raises(InsightsUnavailable) as info:
+        AnthropicInsights(FakeClient(no_block)).propose(ThemeBrief("k", "т", 1, []))
+    assert info.value.tokens == 55
+    with pytest.raises(InsightsUnavailable) as info:
+        AnthropicInsights(FakeClient(_tool_use("report_themes", {}, usage=(10, 2)))).classify(
+            [_case("feedback:1", "т")]
+        )
+    assert info.value.tokens == 12
+
+
+def test_claude_classify_prompt_lists_known_themes():
+    client = FakeClient(_tool_use("report_themes", {"themes": []}))
+    AnthropicInsights(client).classify([_case("feedback:1", "Когда приедет?")], [("delivery", "Доставка")])
+    call = client.calls[0]
+    assert "delivery: Доставка" in call["messages"][0]["content"]
+    assert "ключ" in call["system"]

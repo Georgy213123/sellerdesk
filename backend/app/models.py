@@ -70,6 +70,7 @@ class AgentEventKind(StrEnum):
     STEP_DONE = "step_done"
     LLM_CALL = "llm_call"
     BUDGET_STOP = "budget_stop"
+    STAGE_CUT = "stage_cut"
     ERROR = "error"
     RESUMED = "resumed"
 

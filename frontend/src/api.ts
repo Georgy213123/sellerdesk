@@ -93,6 +93,7 @@ export interface AgentRun {
   tokens_used: number;
   token_budget: number;
   error: string | null;
+  abandoned: boolean;
   created_at: string;
   finished_at: string | null;
 }

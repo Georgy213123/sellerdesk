@@ -33,6 +33,7 @@ function run(over: Partial<AgentRun> = {}): AgentRun {
     tokens_used: 1234,
     token_budget: 60000,
     error: null,
+    abandoned: false,
     created_at: "2026-10-30T09:00:00Z",
     finished_at: "2026-10-30T09:01:00Z",
     ...over,
@@ -192,6 +193,29 @@ describe("вкладка «Агент»", () => {
       await tick(5000);
 
       expect(mocked.agentRuns).toHaveBeenCalledTimes(calls);
+    });
+  });
+
+  describe("брошенный прогон", () => {
+    it("показывает «прервался», не опрашивает и даёт продолжить", async () => {
+      vi.useFakeTimers();
+      try {
+        mocked.agentRuns.mockResolvedValue([run({ status: "running", abandoned: true })]);
+        mocked.startAgentRun.mockResolvedValue(run({ status: "running", abandoned: false }));
+        render(<AgentPage onTemplateCreated={onTemplateCreated} />);
+        await act(() => vi.advanceTimersByTimeAsync(0));
+
+        expect(screen.getByTestId("agent-run")).toHaveTextContent("прервался");
+        const button = screen.getByRole("button", { name: "Продолжить разбор" });
+        expect(button).toBeEnabled();
+        await act(() => vi.advanceTimersByTimeAsync(5000));
+        expect(mocked.agentRuns).toHaveBeenCalledTimes(1);
+
+        await act(async () => button.click());
+        expect(mocked.startAgentRun).toHaveBeenCalledTimes(1);
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 });

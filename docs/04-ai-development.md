@@ -84,6 +84,28 @@ flowchart LR
 Тесты: [test_agent.py](../backend/tests/integration/test_agent.py), [test_pii.py](../backend/tests/unit/test_pii.py),
 [agent-page.test.tsx](../frontend/src/__tests__/agent-page.test.tsx).
 
+## Ревью, круг 4: независимая ревизия агента
+
+Ревизия после коммита модуля: другой ревьюер, только дифф. Сначала красный тест, потом фикс.
+
+| Находка | Подтверждено | Тест |
+|---|---|---|
+| R4-01. После временной ошибки прогон стоял до следующего недельного таймера | да | `test_transient_error_is_retried_with_pause_inside_one_launch`, `test_transient_errors_fail_run_after_max_attempts` |
+| R4-02. Возобновлённый прогон отчитывался за старый период | да | `test_stale_abandoned_run_is_closed_and_new_one_started` |
+| R4-03. Брошенный прогон блокировал кнопку и давал вечный опрос | да | `test_api_marks_abandoned_run`, Vitest «показывает «прервался»» |
+| R4-04. Дата перед телефоном отключала маскирование | да | `test_date_before_phone_does_not_hide_phone`, `test_phone_in_any_format_does_not_reach_provider` |
+| R4-05. Отказ модели терял оплаченные токены | да | `test_refusal_error_carries_paid_tokens`, `test_refused_call_is_charged_by_reported_tokens` |
+| R4-06. Темы не склеивались между пачками | да | `test_second_batch_receives_themes_found_in_first`, `test_claude_classify_prompt_lists_known_themes` |
+| R4-07. Бюджет мог кончиться на классификации, предложений не было | да | `test_classify_stage_gets_only_its_share_of_budget` |
+| R4-08. Владелец прогона определяется по часам Python | отложено, в «Что не сделано» | нет |
+| R4-09. `STEP_STARTED` коммитился без проверки владельца | да | `test_stale_process_does_not_write_step_started_into_journal` |
+| R4-10. Фиксированные даты демо-данных | отложено, в «Что не сделано» | нет |
+| R4-11. Compose не передавал настройки LLM и агента, README обещал `.env` | да | `test_compose_passes_llm_and_agent_settings` |
+
+Тесты: [test_agent.py](../backend/tests/integration/test_agent.py), [test_agent_insights.py](../backend/tests/unit/test_agent_insights.py),
+[test_pii.py](../backend/tests/unit/test_pii.py), [test_compose.py](../backend/tests/unit/test_compose.py),
+[agent-page.test.tsx](../frontend/src/__tests__/agent-page.test.tsx).
+
 ## Что вынес
 
 Тесты, которые писал агент по моему брифу, проверяли только то, что я придумал; ревьюер нашёл потерянное подтверждение, перезапуск

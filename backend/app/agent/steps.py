@@ -56,6 +56,7 @@ def estimate_reserve(session: Session, run: AgentRun, provider: InsightsProvider
     cp = run.checkpoint
     if cp["stage"] == "classify":
         texts = [c.text for c in _load_cases(session, cp["batches"][cp["cursor"]])]
+        texts += [title for _, title in known_themes(cp)]
     else:
         texts = [c.text for c in _load_cases(session, cp["themes"][cp["top"][cp["cursor"]]]["refs"][:MAX_EXAMPLES])]
     return provider.max_output_tokens + PROMPT_OVERHEAD_TOKENS + sum(len(t) for t in texts) // 2
@@ -76,6 +77,19 @@ def execute_step(session: Session, run: AgentRun, provider: InsightsProvider, se
             raise ValueError(f"нет шага для стадии {stage}")
     _settle(result.checkpoint, settings)
     return result
+
+
+def known_themes(cp: Checkpoint) -> list[tuple[str, str]]:
+    """Темы прошлых пачек: модель переиспользует их ключи, и одна тема не дробится по пачкам."""
+    return [(key, theme["title"]) for key, theme in cp["themes"].items()]
+
+
+def cut_classify(cp: Checkpoint, settings: Settings) -> Checkpoint:
+    """Досрочно заканчивает classify: оставшиеся пачки пропускаются, дальше propose по накопленным темам."""
+    cut = copy.deepcopy(cp)
+    cut["cursor"] = len(cut["batches"])
+    _settle(cut, settings)
+    return cut
 
 
 def _settle(cp: Checkpoint, settings: Settings) -> None:
@@ -128,14 +142,14 @@ def theme_key(raw: str) -> str:
 
 def _classify(session: Session, cp: Checkpoint, provider: InsightsProvider) -> StepResult:
     refs = cp["batches"][cp["cursor"]]
-    themes, tokens = provider.classify(_load_cases(session, refs))
+    themes, tokens = provider.classify(_load_cases(session, refs), known_themes(cp))
     for theme in themes:
         key = theme_key(theme.key)
         if not key:
             continue
-        known = cp["themes"].setdefault(key, {"title": theme.title[:128], "refs": []})
+        saved = cp["themes"].setdefault(key, {"title": theme.title[:128], "refs": []})
         # Ссылки, которых не было в пачке, модель могла выдумать: их отбрасываем.
-        known["refs"] += [r for r in dict.fromkeys(theme.refs) if r in refs and r not in known["refs"]]
+        saved["refs"] += [r for r in dict.fromkeys(theme.refs) if r in refs and r not in saved["refs"]]
     cp["cursor"] += 1
     found = len(themes)
     return StepResult(cp, f"пачка {cp['cursor']} из {len(cp['batches'])}: тем {found}", tokens, "classify")

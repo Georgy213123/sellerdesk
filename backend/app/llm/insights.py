@@ -14,7 +14,14 @@ if TYPE_CHECKING:
 
 
 class InsightsUnavailable(Exception):
-    """Провайдер не дал результат. Текст исключения — короткая причина для журнала прогона."""
+    """Провайдер не дал результат. Текст исключения — короткая причина для журнала прогона.
+
+    `tokens` — сколько токенов вызов всё же стоил (отказ модели оплачивается): раннер спишет их.
+    """
+
+    def __init__(self, reason: str, tokens: int = 0) -> None:
+        super().__init__(reason)
+        self.tokens = tokens
 
 
 @dataclass(frozen=True)
@@ -32,6 +39,9 @@ class Theme:
     key: str
     title: str
     refs: list[str]
+
+
+KnownTheme = tuple[str, str]  # (ключ, название) темы, уже найденной в прошлых пачках
 
 
 @dataclass(frozen=True)
@@ -54,7 +64,7 @@ class InsightsProvider(Protocol):
     # Потолок ответа за один вызов: на него runner резервирует бюджет до вызова.
     max_output_tokens: int
 
-    def classify(self, batch: Sequence[Case]) -> tuple[list[Theme], int]: ...
+    def classify(self, batch: Sequence[Case], known: Sequence[KnownTheme] = ()) -> tuple[list[Theme], int]: ...
 
     def propose(self, theme: ThemeBrief) -> tuple[ProposalDraft, int]: ...
 
@@ -136,7 +146,7 @@ class StubInsightsProvider:
     name = "stub"
     max_output_tokens = 512
 
-    def classify(self, batch: Sequence[Case]) -> tuple[list[Theme], int]:
+    def classify(self, batch: Sequence[Case], known: Sequence[KnownTheme] = ()) -> tuple[list[Theme], int]:
         refs: dict[str, list[str]] = {}
         for case in batch:
             lower = case.text.lower()

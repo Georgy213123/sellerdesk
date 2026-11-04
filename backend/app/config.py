@@ -49,6 +49,10 @@ class Settings(BaseSettings):
     # Аренда прогона. Её продлевает каждый шаг, поэтому шаг (вызов LLM с повторами) должен укладываться в неё.
     # Сколько раз подряд прогон переживает временную ошибку провайдера, прежде чем стать failed.
     agent_max_attempts: int = Field(3, ge=1)
+    # Пауза между повторами внутри одного запуска. Должна быть заметно меньше аренды.
+    agent_retry_pause_s: float = Field(60.0, ge=0)
+    # Какую долю бюджета можно потратить на классификацию; остальное — на предложения.
+    agent_classify_budget_share: float = Field(0.7, gt=0, le=1)
     agent_lease_s: int = Field(120, ge=1)
     agent_batch_size: int = Field(20, ge=1)
     agent_top_themes: int = Field(3, ge=1)

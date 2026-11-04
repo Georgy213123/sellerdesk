@@ -1040,6 +1040,7 @@ components:
           - step_done
           - llm_call
           - budget_stop
+          - stage_cut
           - error
           - resumed
           title: Kind
@@ -1105,6 +1106,11 @@ components:
           - type: string
           - type: 'null'
           title: Error
+        abandoned:
+          type: boolean
+          title: Abandoned
+          description: 'Прогон активен, но у него нет живого владельца: аренда истекла'
+          default: false
         created_at:
           type: string
           format: date-time
@@ -1186,6 +1192,11 @@ components:
           - type: string
           - type: 'null'
           title: Error
+        abandoned:
+          type: boolean
+          title: Abandoned
+          description: 'Прогон активен, но у него нет живого владельца: аренда истекла'
+          default: false
         created_at:
           type: string
           format: date-time
