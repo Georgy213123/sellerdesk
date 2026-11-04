@@ -1,5 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { api, newIdempotencyKey, type Chat, type ChatListItem, type Template } from "../api";
+import {
+  ApiError,
+  api,
+  newIdempotencyKey,
+  type Chat,
+  type ChatListItem,
+  type Template,
+} from "../api";
 import { MARKETPLACE_LABEL, STATUS_LABEL, formatTime } from "../format";
 import { ReplyComposer } from "./ReplyComposer";
 import { TemplatePicker } from "./TemplatePicker";
@@ -83,7 +90,16 @@ export function ChatsPage({ templates, refreshToken }: Props) {
   async function requestDraft() {
     if (!shown) return;
     const chatId = shown.id;
-    const d = await api.chatDraft(chatId);
+    let d;
+    try {
+      d = await api.chatDraft(chatId);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 503) {
+        setInfo(err.message); // AI недоступен: оператор пишет ответ сам
+        return;
+      }
+      throw err;
+    }
     if (openIdRef.current !== chatId) {
       await loadList(); // черновик сохранён в карточке своего чата
       return;

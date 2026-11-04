@@ -3,7 +3,7 @@ info:
   title: SellerDesk API
   description: 'Рабочее место оператора продавца на маркетплейсах: единая лента чатов,
     отзывы и вопросы, AI-черновики и шаблоны ответов. Демо: площадки и LLM — заглушки.'
-  version: 0.3.2
+  version: 0.4.0
 paths:
   /api/health:
     get:
@@ -257,6 +257,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorOut'
           description: Not Found
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Service Unavailable
         '422':
           description: Validation Error
           content:
@@ -487,6 +493,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorOut'
           description: Not Found
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Service Unavailable
         '422':
           description: Validation Error
           content:

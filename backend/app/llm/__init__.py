@@ -5,7 +5,15 @@
 """
 
 from dataclasses import dataclass
-from typing import Protocol
+from functools import lru_cache
+from typing import TYPE_CHECKING, Protocol
+
+if TYPE_CHECKING:
+    from app.config import Settings
+
+
+class DraftUnavailable(Exception):
+    """Провайдер не смог дать черновик. Текст исключения — короткая причина для оператора."""
 
 
 @dataclass(frozen=True)
@@ -81,5 +89,21 @@ class StubLLMProvider:
         return Draft(text=f"{greeting} {body}\nКоманда «Северный свет»", provider=self.name)
 
 
-def get_llm_provider() -> LLMProvider:
+@lru_cache
+def _build(provider: str, model: str, timeout_s: float) -> LLMProvider:
+    if provider == "anthropic":
+        import anthropic
+
+        from app.llm.anthropic_provider import AnthropicProvider
+
+        client = anthropic.Anthropic(timeout=timeout_s, max_retries=2)
+        return AnthropicProvider(client, model=model)
     return StubLLMProvider()
+
+
+def get_llm_provider(settings: "Settings | None" = None) -> LLMProvider:
+    if settings is None:
+        from app.config import get_settings
+
+        settings = get_settings()
+    return _build(settings.llm_provider, settings.llm_model, settings.llm_timeout_s)

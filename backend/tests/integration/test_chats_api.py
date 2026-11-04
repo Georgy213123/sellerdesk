@@ -165,3 +165,22 @@ def test_us05_template_with_missing_value_becomes_draft(client, auth, synced, mo
     assert "order_number" in card["draft_note"]
     assert card["status"] == "in_progress"
     assert all(not m.sent_log for m in mocks.values())
+
+
+def test_ai_draft_unavailable_returns_503(client, auth, synced, monkeypatch):
+    from app.llm import DraftUnavailable
+
+    class Down:
+        name = "down"
+
+        def draft_reply(self, request):
+            raise DraftUnavailable("таймаут")
+
+    monkeypatch.setattr("app.api.routes.get_llm_provider", lambda: Down())
+    chat_id = client.get("/api/chats", headers=auth).json()["items"][0]["id"]
+    r = client.post(f"/api/chats/{chat_id}/ai-draft", headers=auth)
+    assert r.status_code == 503
+    assert r.json() == {"detail": "AI-черновик недоступен: таймаут"}
+    assert client.get(f"/api/chats/{chat_id}", headers=auth).json()["draft_text"] is None
+    fb_id = client.get("/api/feedback", headers=auth).json()["items"][0]["id"]
+    assert client.post(f"/api/feedback/{fb_id}/ai-draft", headers=auth).status_code == 503

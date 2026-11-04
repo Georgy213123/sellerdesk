@@ -7,7 +7,8 @@ vi.mock("../api", async (orig) => {
   return { ...real, api: { chats: vi.fn(), chat: vi.fn(), chatDraft: vi.fn() } };
 });
 
-const { api } = await import("../api");
+const real = await import("../api");
+const { api } = real;
 const { ChatsPage } = await import("../components/ChatsPage");
 const mocked = vi.mocked(api);
 
@@ -63,5 +64,16 @@ describe("BUG-11: статус карточки после AI-черновика
     expect(
       await screen.findByText("В работе", { selector: "[data-testid=card-status]" }),
     ).toBeVisible();
+  });
+
+  it("503 от AI-черновика: сообщение в карточке, поле ответа остаётся", async () => {
+    mocked.chatDraft.mockRejectedValueOnce(
+      new real.ApiError(503, "AI-черновик недоступен: таймаут"),
+    );
+    render(<ChatsPage templates={[]} refreshToken={0} />);
+    fireEvent.click(await screen.findByRole("button", { name: /Анна/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "AI-черновик" }));
+    expect(await screen.findByRole("status")).toHaveTextContent("AI-черновик недоступен: таймаут");
+    expect(screen.getByRole("textbox", { name: "Текст ответа" })).toBeVisible();
   });
 });

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, type Feedback, type Template } from "../api";
+import { ApiError, api, type Feedback, type Template } from "../api";
 import { MARKETPLACE_LABEL, formatTime } from "../format";
 import { ReplyComposer } from "./ReplyComposer";
 import { TemplatePicker } from "./TemplatePicker";
@@ -104,10 +104,20 @@ export function FeedbackItem({ item, open, onToggle, templates, onChanged }: Ite
     text: item.draft_text,
     note: item.draft_note,
   });
+  const [draftError, setDraftError] = useState<string | null>(null);
 
   async function requestDraft() {
-    const d = await api.feedbackDraft(item.id);
-    setDraft({ text: d.text, note: null });
+    try {
+      const d = await api.feedbackDraft(item.id);
+      setDraft({ text: d.text, note: null });
+      setDraftError(null);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 503) {
+        setDraftError(err.message); // AI недоступен: оператор пишет ответ сам
+        return;
+      }
+      throw err;
+    }
   }
 
   async function applyTemplate(id: number) {
@@ -153,6 +163,11 @@ export function FeedbackItem({ item, open, onToggle, templates, onChanged }: Ite
             </button>
             <TemplatePicker templates={templates} onApply={applyTemplate} />
           </div>
+          {draftError && (
+            <p className="warning" role="alert">
+              {draftError}
+            </p>
+          )}
           <ReplyComposer draft={draft.text} note={draft.note} onSend={send} label="Ответить" />
         </div>
       ) : (

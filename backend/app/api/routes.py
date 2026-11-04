@@ -9,7 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from app import replies
 from app.api.deps import OperatorDep, SessionDep
 from app.db import get_sessionmaker
-from app.llm import get_llm_provider
+from app.llm import DraftUnavailable, get_llm_provider
 from app.marketplaces import get_client, get_clients
 from app.models import Chat, Feedback, Message, Operator, ReplyTemplate, SyncJob
 from app.schemas import (
@@ -172,10 +172,23 @@ def reply_to_chat(
     return ReplyOut(message=MessageOut.model_validate(result.message), duplicate=result.duplicate)
 
 
-@router.post("/chats/{chat_id}/ai-draft", response_model=DraftOut, responses=NOT_FOUND, tags=["chats"])
+def _draft_unavailable(exc: DraftUnavailable) -> HTTPException:
+    return HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, f"AI-черновик недоступен: {exc}")
+
+
+@router.post(
+    "/chats/{chat_id}/ai-draft",
+    response_model=DraftOut,
+    responses={**NOT_FOUND, 503: {"model": ErrorOut}},
+    tags=["chats"],
+)
 def chat_ai_draft(chat_id: int, session: SessionDep, _: OperatorDep) -> DraftOut:
     """Черновик от LLM-провайдера. Сохраняется в карточке, покупателю не уходит."""
-    text_, provider = replies.ai_draft_chat(session, get_llm_provider(), _get_chat(session, chat_id))
+    chat = _get_chat(session, chat_id)
+    try:
+        text_, provider = replies.ai_draft_chat(session, get_llm_provider(), chat)
+    except DraftUnavailable as exc:
+        raise _draft_unavailable(exc) from exc
     return DraftOut(text=text_, provider=provider)
 
 
@@ -292,9 +305,18 @@ def answer_feedback(feedback_id: int, body: ReplyIn, session: SessionDep, _: Ope
     return _feedback_out(fb)
 
 
-@router.post("/feedback/{feedback_id}/ai-draft", response_model=DraftOut, responses=NOT_FOUND, tags=["feedback"])
+@router.post(
+    "/feedback/{feedback_id}/ai-draft",
+    response_model=DraftOut,
+    responses={**NOT_FOUND, 503: {"model": ErrorOut}},
+    tags=["feedback"],
+)
 def feedback_ai_draft(feedback_id: int, session: SessionDep, _: OperatorDep) -> DraftOut:
-    text_, provider = replies.ai_draft_feedback(session, get_llm_provider(), _get_feedback(session, feedback_id))
+    fb = _get_feedback(session, feedback_id)
+    try:
+        text_, provider = replies.ai_draft_feedback(session, get_llm_provider(), fb)
+    except DraftUnavailable as exc:
+        raise _draft_unavailable(exc) from exc
     return DraftOut(text=text_, provider=provider)
 
 
