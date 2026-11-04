@@ -2,91 +2,43 @@
 
 ```mermaid
 erDiagram
-    operators {
-        int id PK
-        string login UK
-        string display_name
-        string password_hash
-    }
-    products {
-        string sku PK
-        string title
-        string category
-    }
+    products ||--o{ chats : ""
+    products ||--o{ feedback : ""
+    chats ||--|{ messages : ""
     chats {
-        int id PK
-        string marketplace "UK вместе с external_id"
+        string marketplace
         string external_id
-        string buyer_name "nullable"
-        string product_sku FK
-        string order_number "nullable"
-        string status "new | in_progress | answered"
+        string status
         timestamptz last_message_at
-        text draft_text "nullable"
-        text draft_note "nullable"
-        timestamptz synced_at
+        text draft_text
     }
     messages {
-        int id PK
-        int chat_id FK
-        string external_id "UK с chat_id, nullable"
-        string author "buyer | operator"
+        int chat_id
+        string external_id
+        string idempotency_key
         text text
-        timestamptz created_at
-        string idempotency_key "UK с chat_id, nullable"
     }
     feedback {
-        int id PK
-        string marketplace "UK вместе с external_id"
+        string marketplace
         string external_id
-        string kind "review | question"
-        string product_sku FK
-        string buyer_name "nullable"
-        int rating "1..5, null у вопроса"
-        text text
-        timestamptz created_at
-        text answer_text "nullable"
-        timestamptz answered_at "nullable"
-        text draft_text "nullable"
-        text draft_note "nullable"
-    }
-    reply_templates {
-        int id PK
-        string name UK
-        text body
+        string kind
+        int rating
+        text answer_text
     }
     sync_jobs {
-        int id PK
-        string status "queued | running | done | failed"
+        string status
         timestamptz created_at
-        timestamptz started_at
-        timestamptz finished_at
-        int chats_upserted
-        int messages_inserted
-        int feedback_upserted
         text error
     }
-
-    products ||--o{ chats : "о товаре"
-    products ||--o{ feedback : "о товаре"
-    chats ||--|{ messages : "переписка"
 ```
 
-## Словарь данных
+Ещё две таблицы без связей: `operators` и `reply_templates`.
 
-| Таблица.поле | Смысл | Правило |
-|---|---|---|
-| `chats.marketplace` + `external_id` | чат на площадке | уникальная пара — ключ upsert синхронизации |
-| `chats.status` | состояние в работе оператора | `new` → `in_progress` (черновик или шаблон с пропуском) → `answered` (ответ ушёл); новое сообщение покупателя после ответа возвращает `new` |
-| `chats.last_message_at` | время последнего сообщения | `timestamptz`, UTC; по нему сортируется лента |
-| `chats.draft_text`, `draft_note` | черновик и причина, почему он не отправлен | очищаются после отправки |
-| `messages.external_id` | id сообщения на площадке | уникален в чате; у нашего ответа заполняется после отправки, поэтому следующая синхронизация не создаёт копию |
-| `messages.idempotency_key` | ключ намерения ответить | уникален в чате; повтор запроса с ключом возвращает то же сообщение |
-| `feedback.kind` | отзыв или вопрос | у вопроса `rating` пуст (CHECK 1..5) |
-| `feedback.answer_text` | ответ продавца | ставится условным UPDATE `WHERE answer_text IS NULL`; при синхронизации не затирается |
-| `reply_templates.body` | текст с `{{переменными}}` | переменные регистронезависимы; неизвестные отклоняются при создании |
-| `sync_jobs.status` | состояние фоновой задачи | одновременно активна одна |
+- `chats`, `feedback`: (marketplace, external_id) — уникальная пара, ключ upsert синхронизации.
+- `chats.status` — `new` → `in_progress` → `answered`.
+- `messages.external_id` — у нашего ответа пишется после отправки, синхронизация не делает копию.
+- `messages.idempotency_key` — уникален в чате, повтор возвращает то же сообщение.
+- `feedback.answer_text` — ставится условным UPDATE `WHERE answer_text IS NULL`.
+- `sync_jobs.status` — одна активная задача, частичный уникальный индекс.
 
-Все отметки времени — `timestamptz`; соединение с БД работает в зоне UTC, API отдаёт время
-со смещением `+00:00`. Схема создаётся миграциями Alembic (`backend/migrations`), тест
-`test_models_match_migrations` сверяет их с моделями.
+Время везде `timestamptz`, API отдаёт UTC.
