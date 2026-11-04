@@ -7,14 +7,19 @@ from typing import Literal
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+DEMO_JWT_SECRET = "demo-only-change-me-0123456789abcdef"  # noqa: S105 — демо-значение
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     database_url: str = "postgresql+psycopg://sellerdesk:sellerdesk@localhost:55101/sellerdesk"
 
+    # dev — демо-стенд; production — без демо-секрета JWT (приложение не стартует).
+    app_env: Literal["dev", "production"] = "dev"
+
     # Подпись JWT. Значение по умолчанию годится только для демо-стенда.
-    jwt_secret: str = "demo-only-change-me-0123456789abcdef"  # noqa: S105 — демо-значение, в окружении задаётся своё
+    jwt_secret: str = DEMO_JWT_SECRET
     jwt_ttl_minutes: int = 480
 
     # Учётка оператора из сида. Пароль задаётся окружением, в коде только демо-значение.
@@ -37,6 +42,13 @@ class Settings(BaseSettings):
     sync_job_stale_after_s: int = 600
 
     cors_origins: str = "http://localhost:5101,http://127.0.0.1:5101"
+
+    @model_validator(mode="after")
+    def _require_real_jwt_secret(self) -> "Settings":
+        # Fail-closed: в production демо-секрет или короткий секрет позволяют подделать токен.
+        if self.app_env == "production" and (self.jwt_secret == DEMO_JWT_SECRET or len(self.jwt_secret) < 32):
+            raise ValueError("APP_ENV=production требует JWT_SECRET длиной от 32 символов, не демо-значение")
+        return self
 
     @model_validator(mode="after")
     def _require_llm_key(self) -> "Settings":

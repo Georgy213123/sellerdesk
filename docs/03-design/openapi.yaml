@@ -62,6 +62,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/OperatorOut'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
       security:
       - HTTPBearer: []
   /api/chats:
@@ -123,6 +129,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ChatList'
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Unauthorized
         '422':
           description: Validation Error
           content:
@@ -151,6 +163,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ChatOut'
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Unauthorized
         '404':
           content:
             application/json:
@@ -203,6 +221,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ReplyOut'
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Unauthorized
         '404':
           content:
             application/json:
@@ -251,6 +275,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DraftOut'
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Unauthorized
         '404':
           content:
             application/json:
@@ -311,6 +341,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TemplateReplyOut'
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Unauthorized
         '404':
           content:
             application/json:
@@ -407,6 +443,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/FeedbackList'
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Unauthorized
         '422':
           description: Validation Error
           content:
@@ -441,6 +483,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/FeedbackOut'
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Unauthorized
         '404':
           content:
             application/json:
@@ -487,6 +535,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DraftOut'
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Unauthorized
         '404':
           content:
             application/json:
@@ -533,6 +587,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TemplateReplyOut'
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Unauthorized
         '404':
           content:
             application/json:
@@ -573,6 +633,12 @@ paths:
                   $ref: '#/components/schemas/TemplateOut'
                 type: array
                 title: Response List Templates Api Templates Get
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
       security:
       - HTTPBearer: []
     post:
@@ -593,6 +659,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TemplateOut'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
         '400':
           description: Bad Request
           content:
@@ -628,6 +700,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SyncJobOut'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
         '200':
           description: Задача уже в очереди или идёт — возвращается она же
           content:
@@ -652,6 +730,12 @@ paths:
                 - $ref: '#/components/schemas/SyncJobOut'
                 - type: 'null'
                 title: Response Latest Sync Api Sync Latest Get
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
       security:
       - HTTPBearer: []
   /api/sync/{job_id}:
@@ -676,6 +760,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SyncJobOut'
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Unauthorized
         '404':
           content:
             application/json:

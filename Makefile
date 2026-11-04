@@ -1,13 +1,10 @@
 # SellerDesk — единый интерфейс стенда. Порты: PostgreSQL 55101, API 8101, фронт 5101.
 SHELL := /bin/bash
 
-# Тесты чистят таблицы, поэтому по умолчанию у них своя база. Если DATABASE_URL задан
-# в окружении (CI), тесты используют его.
-ifdef DATABASE_URL
-TEST_DATABASE_URL ?= $(DATABASE_URL)
-else
+# Интеграционные тесты пересоздают схему, поэтому берут только TEST_DATABASE_URL (база *_test).
+# Рабочий DATABASE_URL в тесты не подставляется, а conftest отказывается работать с базой без суффикса _test.
 TEST_DATABASE_URL ?= postgresql+psycopg://sellerdesk:sellerdesk@localhost:55101/sellerdesk_test
-endif
+export TEST_DATABASE_URL
 DATABASE_URL ?= postgresql+psycopg://sellerdesk:sellerdesk@localhost:55101/sellerdesk
 export DATABASE_URL
 
@@ -51,7 +48,7 @@ format:
 test: test-backend test-frontend
 
 test-backend:
-	$(BACKEND) DATABASE_URL=$(TEST_DATABASE_URL) uv run pytest --cov=app --cov-report=term
+	$(BACKEND) uv run pytest --cov=app --cov-report=term
 
 test-frontend:
 	$(FRONTEND) npx vitest run

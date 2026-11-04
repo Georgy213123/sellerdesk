@@ -40,6 +40,8 @@ from app.sync import enqueue_sync, run_sync_job
 from app.templating import KNOWN_VARIABLES, template_variables
 
 router = APIRouter(prefix="/api")
+# Маршруты за входом: у всех в контракте есть 401.
+protected = APIRouter(responses={401: {"model": ErrorOut}})
 
 NOT_FOUND: dict[int | str, dict[str, Any]] = {404: {"model": ErrorOut}}
 IdemKey = Annotated[
@@ -68,7 +70,7 @@ def login(body: LoginIn, session: SessionDep) -> TokenOut:
     return TokenOut(access_token=create_token(operator.id), operator=OperatorOut.model_validate(operator))
 
 
-@router.get("/auth/me", response_model=OperatorOut, tags=["auth"])
+@protected.get("/auth/me", response_model=OperatorOut, tags=["auth"])
 def me(operator: OperatorDep) -> OperatorOut:
     return OperatorOut.model_validate(operator)
 
@@ -91,7 +93,7 @@ def _chat_out(chat: Chat) -> ChatOut:
     )
 
 
-@router.get("/chats", response_model=ChatList, tags=["chats"])
+@protected.get("/chats", response_model=ChatList, tags=["chats"])
 def list_chats(
     session: SessionDep,
     _: OperatorDep,
@@ -148,12 +150,12 @@ def _get_chat(session: SessionDep, chat_id: int) -> Chat:
     return chat
 
 
-@router.get("/chats/{chat_id}", response_model=ChatOut, responses=NOT_FOUND, tags=["chats"])
+@protected.get("/chats/{chat_id}", response_model=ChatOut, responses=NOT_FOUND, tags=["chats"])
 def get_chat(chat_id: int, session: SessionDep, _: OperatorDep) -> ChatOut:
     return _chat_out(_get_chat(session, chat_id))
 
 
-@router.post(
+@protected.post(
     "/chats/{chat_id}/reply",
     response_model=ReplyOut,
     responses={**NOT_FOUND, 409: {"model": ErrorOut}, 502: {"model": ErrorOut}},
@@ -176,7 +178,7 @@ def _draft_unavailable(exc: DraftUnavailable) -> HTTPException:
     return HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, f"AI-черновик недоступен: {exc}")
 
 
-@router.post(
+@protected.post(
     "/chats/{chat_id}/ai-draft",
     response_model=DraftOut,
     responses={**NOT_FOUND, 503: {"model": ErrorOut}},
@@ -199,7 +201,7 @@ def _get_template(session: SessionDep, template_id: int) -> ReplyTemplate:
     return tpl
 
 
-@router.post(
+@protected.post(
     "/chats/{chat_id}/template-reply",
     response_model=TemplateReplyOut,
     responses={**NOT_FOUND, 409: {"model": ErrorOut}, 502: {"model": ErrorOut}},
@@ -251,7 +253,7 @@ def _get_feedback(session: SessionDep, feedback_id: int) -> Feedback:
     return fb
 
 
-@router.get("/feedback", response_model=FeedbackList, tags=["feedback"])
+@protected.get("/feedback", response_model=FeedbackList, tags=["feedback"])
 def list_feedback(
     session: SessionDep,
     _: OperatorDep,
@@ -288,7 +290,7 @@ def list_feedback(
     return FeedbackList(items=[_feedback_out(f) for f in items], total=total)
 
 
-@router.post(
+@protected.post(
     "/feedback/{feedback_id}/answer",
     response_model=FeedbackOut,
     responses={**NOT_FOUND, 409: {"model": ErrorOut}, 502: {"model": ErrorOut}},
@@ -305,7 +307,7 @@ def answer_feedback(feedback_id: int, body: ReplyIn, session: SessionDep, _: Ope
     return _feedback_out(fb)
 
 
-@router.post(
+@protected.post(
     "/feedback/{feedback_id}/ai-draft",
     response_model=DraftOut,
     responses={**NOT_FOUND, 503: {"model": ErrorOut}},
@@ -320,7 +322,7 @@ def feedback_ai_draft(feedback_id: int, session: SessionDep, _: OperatorDep) -> 
     return DraftOut(text=text_, provider=provider)
 
 
-@router.post(
+@protected.post(
     "/feedback/{feedback_id}/template-reply",
     response_model=TemplateReplyOut,
     responses={**NOT_FOUND, 409: {"model": ErrorOut}, 502: {"model": ErrorOut}},
@@ -345,13 +347,13 @@ def _template_out(t: ReplyTemplate) -> TemplateOut:
     return TemplateOut(id=t.id, name=t.name, body=t.body, variables=template_variables(t.body))
 
 
-@router.get("/templates", response_model=list[TemplateOut], tags=["templates"])
+@protected.get("/templates", response_model=list[TemplateOut], tags=["templates"])
 def list_templates(session: SessionDep, _: OperatorDep) -> list[TemplateOut]:
     rows = session.execute(select(ReplyTemplate).order_by(ReplyTemplate.id)).scalars().all()
     return [_template_out(t) for t in rows]
 
 
-@router.post(
+@protected.post(
     "/templates",
     response_model=TemplateOut,
     status_code=status.HTTP_201_CREATED,
@@ -376,7 +378,7 @@ def create_template(body: TemplateIn, session: SessionDep, _: OperatorDep) -> Te
 
 
 # --- синхронизация --------------------------------------------------------------------------------------
-@router.post(
+@protected.post(
     "/sync",
     response_model=SyncJobOut,
     status_code=status.HTTP_202_ACCEPTED,
@@ -393,15 +395,18 @@ def start_sync(session: SessionDep, _: OperatorDep, background: BackgroundTasks,
     return SyncJobOut.model_validate(job)
 
 
-@router.get("/sync/latest", response_model=SyncJobOut | None, tags=["sync"])
+@protected.get("/sync/latest", response_model=SyncJobOut | None, tags=["sync"])
 def latest_sync(session: SessionDep, _: OperatorDep) -> SyncJobOut | None:
     job = session.execute(select(SyncJob).order_by(SyncJob.id.desc()).limit(1)).scalar_one_or_none()
     return SyncJobOut.model_validate(job) if job else None
 
 
-@router.get("/sync/{job_id}", response_model=SyncJobOut, responses=NOT_FOUND, tags=["sync"])
+@protected.get("/sync/{job_id}", response_model=SyncJobOut, responses=NOT_FOUND, tags=["sync"])
 def get_sync(job_id: int, session: SessionDep, _: OperatorDep) -> SyncJobOut:
     job = session.get(SyncJob, job_id)
     if job is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "задача не найдена")
     return SyncJobOut.model_validate(job)
+
+
+router.include_router(protected)
