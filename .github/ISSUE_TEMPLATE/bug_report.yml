@@ -1,0 +1,37 @@
+name: Баг
+description: Что-то работает не так, как описано в требованиях
+labels: [bug]
+body:
+  - type: textarea
+    id: symptom
+    attributes:
+      label: Симптом
+      description: Что видно пользователю
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Шаги воспроизведения
+      placeholder: |
+        1. make up
+        2. открыть …
+        3. нажать …
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Ожидаемо / фактически
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: Окружение
+      placeholder: commit, браузер, вьюпорт
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Серьёзность
+      options: [блокирующий, критический, значительный, незначительный]

@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Уязвимость
+    url: https://github.com/Georgy213123/ai-product-engineering/security/advisories/new
+    about: Об уязвимостях — приватно, не через issue

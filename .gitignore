@@ -9,3 +9,23 @@ node_modules/
 dist/
 e2e/playwright-report/
 e2e/test-results/
+
+# Общее
+.env.*
+!.env.example
+*.pem
+*.key
+*.py[cod]
+htmlcov/
+coverage.xml
+.vite/
+coverage/
+playwright-report/
+test-results/
+blob-report/
+probe-report/
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.tsbuildinfo

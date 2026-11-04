@@ -1,0 +1,25 @@
+name: Задача
+description: Новая возможность или улучшение
+labels: [enhancement]
+body:
+  - type: textarea
+    id: story
+    attributes:
+      label: История
+      placeholder: Как <роль>, я хочу <действие>, чтобы <ценность>
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Критерии приёмки
+      placeholder: |
+        Given …
+        When …
+        Then …
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Вне рамок

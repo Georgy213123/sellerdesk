@@ -1,0 +1,15 @@
+# Базовые правила gitleaks плюс запрет строк подключения с паролем.
+[extend]
+useDefault = true
+
+[[rules]]
+id = "db-url-with-password"
+description = "Строка подключения к БД с паролем, отличным от учебного"
+regex = '''postgres(?:ql)?(?:\+\w+)?://[^:\s/@]+:([^@\s]{3,})@'''
+secretGroup = 1
+tags = ["database", "credentials"]
+
+[[rules.allowlists]]
+description = "Учебные пароли локального стенда и подстановки переменных окружения"
+regexTarget = "secret"
+regexes = ['''^(postgres|app|sellerdesk|shopprobe|orderflow|orderflow-local|change-me|example)$''', '''^\$\{''']

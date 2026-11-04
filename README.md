@@ -1,5 +1,9 @@
 # SellerDesk
 
+[![CI](https://github.com/Georgy213123/sellerdesk/actions/workflows/ci.yml/badge.svg)](https://github.com/Georgy213123/sellerdesk/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/Georgy213123/sellerdesk/actions/workflows/codeql.yml/badge.svg)](https://github.com/Georgy213123/sellerdesk/actions/workflows/codeql.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 Оператор отвечает покупателям Wildberries, Ozon и Яндекс Маркета в трёх медленных кабинетах. SellerDesk сводит чаты, отзывы и вопросы в одну ленту с AI-черновиками и шаблонами,
 и ответ не уходит дважды или с `{{переменной}}` в тексте. Продавец и данные вымышлены.
 
@@ -67,3 +71,8 @@ make up                 # docker compose: postgres :55101, API :8101, фронт
 [Истории](docs/02-analysis/user-stories.md) · [Архитектура](docs/03-design/architecture.md) ·
 [ER](docs/03-design/er.md) · [OpenAPI](docs/03-design/openapi.yaml) · [AI-разработка](docs/04-ai-development.md) ·
 [Тесты](docs/05-testing.md) · [Баги](docs/06-bugs.md) · [Релизы](docs/07-releases.md)
+
+---
+
+Один из трёх кейсов витрины [ai-product-engineering](https://github.com/Georgy213123/ai-product-engineering):
+там же процесс работы с агентами и два других кейса.
