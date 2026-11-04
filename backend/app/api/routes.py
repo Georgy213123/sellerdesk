@@ -158,7 +158,7 @@ def get_chat(chat_id: int, session: SessionDep, _: OperatorDep) -> ChatOut:
 @protected.post(
     "/chats/{chat_id}/reply",
     response_model=ReplyOut,
-    responses={**NOT_FOUND, 409: {"model": ErrorOut}, 502: {"model": ErrorOut}},
+    responses={**NOT_FOUND, 409: {"model": ErrorOut}, 422: {"model": ErrorOut}, 502: {"model": ErrorOut}},
     tags=["chats"],
 )
 def reply_to_chat(
@@ -167,6 +167,8 @@ def reply_to_chat(
     chat = _get_chat(session, chat_id)
     try:
         result = replies.send_chat_reply(session, get_client(chat.marketplace), chat_id, body.text, idempotency_key)
+    except replies.UnresolvedTemplateError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
     except replies.ConflictError as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
     except replies.MarketplaceError as exc:
@@ -293,13 +295,15 @@ def list_feedback(
 @protected.post(
     "/feedback/{feedback_id}/answer",
     response_model=FeedbackOut,
-    responses={**NOT_FOUND, 409: {"model": ErrorOut}, 502: {"model": ErrorOut}},
+    responses={**NOT_FOUND, 409: {"model": ErrorOut}, 422: {"model": ErrorOut}, 502: {"model": ErrorOut}},
     tags=["feedback"],
 )
 def answer_feedback(feedback_id: int, body: ReplyIn, session: SessionDep, _: OperatorDep) -> FeedbackOut:
     fb = _get_feedback(session, feedback_id)
     try:
         fb = replies.answer_feedback(session, get_client(fb.marketplace), feedback_id, body.text)
+    except replies.UnresolvedTemplateError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
     except replies.ConflictError as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
     except replies.MarketplaceError as exc:

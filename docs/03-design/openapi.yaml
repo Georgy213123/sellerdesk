@@ -239,18 +239,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorOut'
           description: Conflict
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Unprocessable Entity
         '502':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorOut'
           description: Bad Gateway
-        '422':
-          description: Validation Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
   /api/chats/{chat_id}/ai-draft:
     post:
       tags:
@@ -501,18 +501,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorOut'
           description: Conflict
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Unprocessable Entity
         '502':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorOut'
           description: Bad Gateway
-        '422':
-          description: Validation Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
   /api/feedback/{feedback_id}/ai-draft:
     post:
       tags:

@@ -21,6 +21,16 @@ class ConflictError(Exception):
     pass
 
 
+class UnresolvedTemplateError(Exception):
+    """В тексте остались переменные шаблона: такой ответ покупателю не уходит (BUG-13)."""
+
+
+def ensure_no_template_markup(text: str) -> None:
+    # Проверка на сервере, а не только в интерфейсе: API можно вызвать в обход кнопки.
+    if "{{" in text or "}}" in text:
+        raise UnresolvedTemplateError("в тексте осталась переменная шаблона — подставьте значение")
+
+
 class MarketplaceError(Exception):
     pass
 
@@ -44,6 +54,7 @@ def send_chat_reply(
     chat = session.get(Chat, chat_id)
     if chat is None:
         raise NotFoundError("чат не найден")
+    ensure_no_template_markup(text)
 
     reserved = session.execute(
         insert(Message)
@@ -92,6 +103,7 @@ def answer_feedback(session: Session, client: MarketplaceClient, feedback_id: in
     fb = session.get(Feedback, feedback_id)
     if fb is None:
         raise NotFoundError("отзыв не найден")
+    ensure_no_template_markup(text)
     now = datetime.now(UTC)
     updated = session.execute(
         update(Feedback)

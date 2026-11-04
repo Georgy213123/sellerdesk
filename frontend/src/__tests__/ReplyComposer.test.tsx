@@ -37,4 +37,15 @@ describe("ReplyComposer (US-02, BUG-01)", () => {
     expect(screen.getByRole("textbox")).toHaveValue("Заказ {{order_number}} в пути");
     expect(screen.getByRole("alert")).toHaveTextContent("order_number");
   });
+
+  it("BUG-13: с переменной шаблона кнопка недоступна, после подстановки — доступна", async () => {
+    const user = userEvent.setup();
+    render(<ReplyComposer draft="Здравствуйте, {{buyer_name}}!" onSend={vi.fn()} />);
+    const send = screen.getByRole("button", { name: "Отправить" });
+    expect(send).toBeDisabled();
+    expect(screen.getByRole("status")).toHaveTextContent("переменная шаблона");
+    await user.clear(screen.getByRole("textbox"));
+    await user.type(screen.getByRole("textbox"), "Здравствуйте, Анна!");
+    expect(send).toBeEnabled();
+  });
 });

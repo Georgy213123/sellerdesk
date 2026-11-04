@@ -16,6 +16,7 @@ interface Props {
  */
 export function ReplyComposer({ draft, note, onSend, label = "Отправить" }: Props) {
   const [text, setText] = useState(draft ?? "");
+  const hasMarkup = text.includes("{{") || text.includes("}}");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Ключ привязан к тексту: повтор того же текста — тот же ключ, правка после ошибки — новый.
@@ -69,12 +70,17 @@ export function ReplyComposer({ draft, note, onSend, label = "Отправить
         rows={4}
         placeholder="Ответ покупателю"
       />
+      {hasMarkup && (
+        <p className="warning" role="status">
+          В тексте осталась переменная шаблона в {"{{ }}"}. Подставьте значение перед отправкой.
+        </p>
+      )}
       {error && (
         <p className="error" role="alert">
           {error}
         </p>
       )}
-      <button type="submit" disabled={sending || !text.trim()}>
+      <button type="submit" disabled={sending || !text.trim() || hasMarkup}>
         {sending ? "Отправляем…" : label}
       </button>
     </form>
