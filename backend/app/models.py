@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from enum import StrEnum
+from typing import Any
 
 from sqlalchemy import (
     CheckConstraint,
@@ -15,6 +16,7 @@ from sqlalchemy import (
     func,
     text,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -49,6 +51,38 @@ class JobStatus(StrEnum):
     RUNNING = "running"
     DONE = "done"
     FAILED = "failed"
+
+
+class AgentKind(StrEnum):
+    WEEKLY_INSIGHTS = "weekly_insights"
+
+
+class AgentRunStatus(StrEnum):
+    QUEUED = "queued"
+    RUNNING = "running"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+    BUDGET_EXHAUSTED = "budget_exhausted"
+
+
+class AgentEventKind(StrEnum):
+    STEP_STARTED = "step_started"
+    STEP_DONE = "step_done"
+    LLM_CALL = "llm_call"
+    BUDGET_STOP = "budget_stop"
+    ERROR = "error"
+    RESUMED = "resumed"
+
+
+class ProposalKind(StrEnum):
+    REPLY_TEMPLATE = "reply_template"
+    CARD_EDIT = "card_edit"
+
+
+class ProposalStatus(StrEnum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
 
 
 def _tz() -> DateTime:
@@ -167,3 +201,71 @@ class SyncJob(Base):
     messages_inserted: Mapped[int] = mapped_column(Integer, default=0)
     feedback_upserted: Mapped[int] = mapped_column(Integer, default=0)
     error: Mapped[str | None] = mapped_column(Text)
+
+
+class AgentRun(Base):
+    """Прогон агента. Чекпоинт и аренда позволяют подобрать прогон, упавший посередине."""
+
+    __tablename__ = "agent_runs"
+    __table_args__ = (
+        # Один активный прогон на вид: параллельные запуски не плодят дубли.
+        Index(
+            "uq_agent_runs_one_active",
+            "kind",
+            unique=True,
+            postgresql_where=text("status IN ('queued', 'running')"),
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    kind: Mapped[str] = mapped_column(String(32))
+    status: Mapped[str] = mapped_column(String(24), default=AgentRunStatus.QUEUED)
+    period_from: Mapped[datetime] = mapped_column(_tz())
+    period_to: Mapped[datetime] = mapped_column(_tz())
+    checkpoint: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    tokens_used: Mapped[int] = mapped_column(Integer, default=0)
+    token_budget: Mapped[int] = mapped_column(Integer)
+    steps_done: Mapped[int] = mapped_column(Integer, default=0)
+    max_steps: Mapped[int] = mapped_column(Integer)
+    lease_until: Mapped[datetime | None] = mapped_column(_tz())
+    heartbeat_at: Mapped[datetime | None] = mapped_column(_tz())
+    error: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(_tz(), server_default=func.now())
+    started_at: Mapped[datetime | None] = mapped_column(_tz())
+    finished_at: Mapped[datetime | None] = mapped_column(_tz())
+
+    events: Mapped[list["AgentEvent"]] = relationship(order_by="AgentEvent.id")
+
+
+class AgentEvent(Base):
+    """Журнал прогона: что сделано на каком шаге и сколько токенов ушло."""
+
+    __tablename__ = "agent_events"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    run_id: Mapped[int] = mapped_column(ForeignKey("agent_runs.id", ondelete="CASCADE"), index=True)
+    step: Mapped[int] = mapped_column(Integer)
+    kind: Mapped[str] = mapped_column(String(16))
+    message: Mapped[str] = mapped_column(Text)
+    tokens: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(_tz(), server_default=func.now())
+
+
+class AgentProposal(Base):
+    """Предложение агента на согласование. Наружу не уходит, пока его не одобрил оператор."""
+
+    __tablename__ = "agent_proposals"
+    # Повтор шага после обрыва не создаёт второе такое же предложение.
+    __table_args__ = (UniqueConstraint("run_id", "theme_key", "kind", name="uq_agent_proposals_run_theme_kind"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    run_id: Mapped[int] = mapped_column(ForeignKey("agent_runs.id", ondelete="CASCADE"), index=True)
+    theme_key: Mapped[str] = mapped_column(String(64))
+    kind: Mapped[str] = mapped_column(String(16))
+    title: Mapped[str] = mapped_column(String(128))
+    body: Mapped[str] = mapped_column(Text)
+    evidence: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    status: Mapped[str] = mapped_column(String(16), default=ProposalStatus.PENDING)
+    decided_by: Mapped[int | None] = mapped_column(ForeignKey("operators.id"))
+    decided_at: Mapped[datetime | None] = mapped_column(_tz())
+    created_at: Mapped[datetime] = mapped_column(_tz(), server_default=func.now())

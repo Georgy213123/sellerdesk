@@ -8,7 +8,7 @@ from app.config import get_settings
 def create_app() -> FastAPI:
     app = FastAPI(
         title="SellerDesk API",
-        version="0.4.0",
+        version="0.5.0",
         description=(
             "Рабочее место оператора продавца на маркетплейсах: единая лента чатов, отзывы и вопросы, "
             "AI-черновики и шаблоны ответов. Демо: площадки и LLM — заглушки."

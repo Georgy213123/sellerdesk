@@ -3,7 +3,7 @@ info:
   title: SellerDesk API
   description: 'Рабочее место оператора продавца на маркетплейсах: единая лента чатов,
     отзывы и вопросы, AI-черновики и шаблоны ответов. Демо: площадки и LLM — заглушки.'
-  version: 0.4.0
+  version: 0.5.0
 paths:
   /api/health:
     get:
@@ -784,8 +784,440 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/agent/runs:
+    get:
+      tags:
+      - agent
+      summary: List Runs
+      operationId: list_runs_api_agent_runs_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/AgentRunOut'
+                type: array
+                title: Response List Runs Api Agent Runs Get
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+      security:
+      - HTTPBearer: []
+    post:
+      tags:
+      - agent
+      summary: Start Run
+      description: 'Ставит прогон и сразу отвечает. Разбор идёт в фоне, результат
+        — в списке прогонов и предложений.
+
+
+        Если активный прогон брошен (аренда истекла), возобновляет его и отвечает
+        202 с прежним id.'
+      operationId: start_run_api_agent_runs_post
+      responses:
+        '202':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentRunOut'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+        '503':
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+      security:
+      - HTTPBearer: []
+  /api/agent/runs/{run_id}:
+    get:
+      tags:
+      - agent
+      summary: Get Run
+      operationId: get_run_api_agent_runs__run_id__get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: run_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Run Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentRunDetailOut'
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Unauthorized
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Not Found
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/agent/proposals:
+    get:
+      tags:
+      - agent
+      summary: List Proposals
+      operationId: list_proposals_api_agent_proposals_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - enum:
+            - pending
+            - approved
+            - rejected
+            type: string
+          - type: 'null'
+          title: Status
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProposalOut'
+                title: Response List Proposals Api Agent Proposals Get
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Unauthorized
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/agent/proposals/{proposal_id}/approve:
+    post:
+      tags:
+      - agent
+      summary: Approve Proposal
+      description: Одобрить. Шаблон ответа будет создан; правка карточки только помечается
+        одобренной.
+      operationId: approve_proposal_api_agent_proposals__proposal_id__approve_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: proposal_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Proposal Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProposalOut'
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Unauthorized
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Conflict
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Not Found
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/agent/proposals/{proposal_id}/reject:
+    post:
+      tags:
+      - agent
+      summary: Reject Proposal
+      operationId: reject_proposal_api_agent_proposals__proposal_id__reject_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: proposal_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Proposal Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProposalOut'
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Unauthorized
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Conflict
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Not Found
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
 components:
   schemas:
+    AgentEventOut:
+      properties:
+        id:
+          type: integer
+          title: Id
+        step:
+          type: integer
+          title: Step
+        kind:
+          type: string
+          enum:
+          - step_started
+          - step_done
+          - llm_call
+          - budget_stop
+          - error
+          - resumed
+          title: Kind
+        message:
+          type: string
+          title: Message
+        tokens:
+          type: integer
+          title: Tokens
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+      type: object
+      required:
+      - id
+      - step
+      - kind
+      - message
+      - tokens
+      - created_at
+      title: AgentEventOut
+    AgentRunDetailOut:
+      properties:
+        id:
+          type: integer
+          title: Id
+        kind:
+          type: string
+          const: weekly_insights
+          title: Kind
+        status:
+          type: string
+          enum:
+          - queued
+          - running
+          - succeeded
+          - failed
+          - budget_exhausted
+          title: Status
+        period_from:
+          type: string
+          format: date-time
+          title: Period From
+        period_to:
+          type: string
+          format: date-time
+          title: Period To
+        steps_done:
+          type: integer
+          title: Steps Done
+        max_steps:
+          type: integer
+          title: Max Steps
+        tokens_used:
+          type: integer
+          title: Tokens Used
+        token_budget:
+          type: integer
+          title: Token Budget
+        error:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Error
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        started_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Started At
+        finished_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Finished At
+        events:
+          items:
+            $ref: '#/components/schemas/AgentEventOut'
+          type: array
+          title: Events
+      type: object
+      required:
+      - id
+      - kind
+      - status
+      - period_from
+      - period_to
+      - steps_done
+      - max_steps
+      - tokens_used
+      - token_budget
+      - error
+      - created_at
+      - started_at
+      - finished_at
+      - events
+      title: AgentRunDetailOut
+    AgentRunOut:
+      properties:
+        id:
+          type: integer
+          title: Id
+        kind:
+          type: string
+          const: weekly_insights
+          title: Kind
+        status:
+          type: string
+          enum:
+          - queued
+          - running
+          - succeeded
+          - failed
+          - budget_exhausted
+          title: Status
+        period_from:
+          type: string
+          format: date-time
+          title: Period From
+        period_to:
+          type: string
+          format: date-time
+          title: Period To
+        steps_done:
+          type: integer
+          title: Steps Done
+        max_steps:
+          type: integer
+          title: Max Steps
+        tokens_used:
+          type: integer
+          title: Tokens Used
+        token_budget:
+          type: integer
+          title: Token Budget
+        error:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Error
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        started_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Started At
+        finished_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Finished At
+      type: object
+      required:
+      - id
+      - kind
+      - status
+      - period_from
+      - period_to
+      - steps_done
+      - max_steps
+      - tokens_used
+      - token_budget
+      - error
+      - created_at
+      - started_at
+      - finished_at
+      title: AgentRunOut
     ChatList:
       properties:
         items:
@@ -955,6 +1387,30 @@ components:
       required:
       - detail
       title: ErrorOut
+    EvidenceOut:
+      properties:
+        cases:
+          type: integer
+          title: Cases
+          description: Сколько обращений относится к теме
+        feedback_ids:
+          items:
+            type: integer
+          type: array
+          title: Feedback Ids
+          description: Номера отзывов и вопросов (первые 50)
+        message_ids:
+          items:
+            type: integer
+          type: array
+          title: Message Ids
+          description: Номера сообщений покупателей в чатах (первые 50)
+      type: object
+      required:
+      - cases
+      - feedback_ids
+      - message_ids
+      title: EvidenceOut
     FeedbackList:
       properties:
         items:
@@ -1129,6 +1585,67 @@ components:
       - login
       - display_name
       title: OperatorOut
+    ProposalOut:
+      properties:
+        id:
+          type: integer
+          title: Id
+        run_id:
+          type: integer
+          title: Run Id
+        theme_key:
+          type: string
+          title: Theme Key
+        kind:
+          type: string
+          enum:
+          - reply_template
+          - card_edit
+          title: Kind
+        title:
+          type: string
+          title: Title
+        body:
+          type: string
+          title: Body
+        evidence:
+          $ref: '#/components/schemas/EvidenceOut'
+        status:
+          type: string
+          enum:
+          - pending
+          - approved
+          - rejected
+          title: Status
+        decided_by:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Decided By
+        decided_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Decided At
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+      type: object
+      required:
+      - id
+      - run_id
+      - theme_key
+      - kind
+      - title
+      - body
+      - evidence
+      - status
+      - decided_by
+      - decided_at
+      - created_at
+      title: ProposalOut
     ReplyIn:
       properties:
         text:

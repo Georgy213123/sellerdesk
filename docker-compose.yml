@@ -24,6 +24,8 @@ services:
       JWT_SECRET: ${JWT_SECRET:-demo-only-change-me-0123456789abcdef}
       DEMO_OPERATOR_PASSWORD: ${DEMO_OPERATOR_PASSWORD:-demo-password}
       MARKETPLACE_MODE: mock
+      # У демо-данных фиксированные даты (конец октября 2026), поэтому окно разбора агента 90 дней, а не неделя.
+      AGENT_PERIOD_DAYS: ${AGENT_PERIOD_DAYS:-90}
       MOCK_MARKETPLACE_DELAY_MS: ${MOCK_MARKETPLACE_DELAY_MS:-800}
       CORS_ORIGINS: http://localhost:5101
     ports:

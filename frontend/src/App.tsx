@@ -1,17 +1,19 @@
 import { useEffect, useState } from "react";
 import { api, getToken, setToken, type Operator, type Template } from "./api";
+import { AgentPage } from "./components/AgentPage";
 import { ChatsPage } from "./components/ChatsPage";
 import { FeedbackPage } from "./components/FeedbackPage";
 import { LoginForm } from "./components/LoginForm";
 import { SyncButton } from "./components/SyncButton";
 import { TemplatesPage } from "./components/TemplatesPage";
 
-type Tab = "chats" | "feedback" | "templates";
+type Tab = "chats" | "feedback" | "templates" | "agent";
 
 const TABS: [Tab, string][] = [
   ["chats", "Сообщения"],
   ["feedback", "Отзывы и вопросы"],
   ["templates", "Шаблоны"],
+  ["agent", "Агент"],
 ];
 
 export function App() {
@@ -74,6 +76,7 @@ export function App() {
         {tab === "chats" && <ChatsPage templates={templates} refreshToken={refreshToken} />}
         {tab === "feedback" && <FeedbackPage templates={templates} refreshToken={refreshToken} />}
         {tab === "templates" && <TemplatesPage templates={templates} onCreated={reloadTemplates} />}
+        {tab === "agent" && <AgentPage onTemplateCreated={reloadTemplates} />}
       </main>
     </div>
   );

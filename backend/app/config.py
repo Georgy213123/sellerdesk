@@ -4,7 +4,7 @@ import os
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import model_validator
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 DEMO_JWT_SECRET = "demo-only-change-me-0123456789abcdef"  # noqa: S105 — демо-значение
@@ -40,6 +40,19 @@ class Settings(BaseSettings):
 
     # Задача синхронизации, не завершившаяся за это время, считается прерванной (процесс упал).
     sync_job_stale_after_s: int = 600
+
+    # Агент-маркетолог: еженедельный разбор обращений. Выключатель, окно разбора и «обвязка» прогона.
+    agent_enabled: bool = True
+    agent_period_days: int = Field(7, ge=1)
+    agent_token_budget: int = Field(60_000, ge=1)
+    agent_max_steps: int = Field(40, ge=1)
+    # Аренда прогона. Её продлевает каждый шаг, поэтому шаг (вызов LLM с повторами) должен укладываться в неё.
+    # Сколько раз подряд прогон переживает временную ошибку провайдера, прежде чем стать failed.
+    agent_max_attempts: int = Field(3, ge=1)
+    agent_lease_s: int = Field(120, ge=1)
+    agent_batch_size: int = Field(20, ge=1)
+    agent_top_themes: int = Field(3, ge=1)
+    agent_min_cases: int = Field(2, ge=1)
 
     cors_origins: str = "http://localhost:5101,http://127.0.0.1:5101"
 

@@ -29,7 +29,7 @@ get_settings.cache_clear()
 get_engine.cache_clear()
 get_sessionmaker.cache_clear()
 
-TABLES = "messages, chats, feedback, reply_templates, sync_jobs, operators, products"
+TABLES = "agent_runs, messages, chats, feedback, reply_templates, sync_jobs, operators, products"
 
 
 @pytest.fixture(scope="session", autouse=True)

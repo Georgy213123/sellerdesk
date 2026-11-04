@@ -156,7 +156,9 @@ main {
 .feed,
 .feedback-list,
 .messages,
-.template-list {
+.template-list,
+.run-list,
+.proposal-list {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -253,6 +255,7 @@ main {
 .detail-pane,
 .feedback-card,
 .templates,
+.agent,
 .login {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -359,6 +362,8 @@ main {
   padding-left: 10px;
 }
 
+.run-list li,
+.proposal-list li,
 .template-list li {
   border-bottom: 1px solid var(--border);
   padding: 8px 0;
@@ -367,6 +372,47 @@ main {
 .template-list h3 {
   margin: 0;
   font-size: 1rem;
+}
+
+.agent-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.agent h2 {
+  margin: 12px 0 4px;
+  font-size: 1.1rem;
+}
+
+.run-list li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+
+.proposal-list h3 {
+  margin: 4px 0;
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
+
+.proposal-list .actions {
+  margin-top: 8px;
+}
+
+.run-succeeded {
+  color: var(--ok);
+}
+
+.run-failed {
+  color: var(--err);
+}
+
+.run-budget_exhausted {
+  color: var(--warn-text);
 }
 
 .template-form,

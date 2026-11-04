@@ -81,6 +81,34 @@ export interface SyncJob {
   error: string | null;
 }
 
+export type AgentRunStatus = "queued" | "running" | "succeeded" | "failed" | "budget_exhausted";
+
+export interface AgentRun {
+  id: number;
+  status: AgentRunStatus;
+  period_from: string;
+  period_to: string;
+  steps_done: number;
+  max_steps: number;
+  tokens_used: number;
+  token_budget: number;
+  error: string | null;
+  created_at: string;
+  finished_at: string | null;
+}
+
+export interface Proposal {
+  id: number;
+  run_id: number;
+  theme_key: string;
+  kind: "reply_template" | "card_edit";
+  title: string;
+  body: string;
+  evidence: { cases: number; feedback_ids: number[]; message_ids: number[] };
+  status: "pending" | "approved" | "rejected";
+  created_at: string;
+}
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -186,6 +214,12 @@ export const api = {
   startSync: () => request<SyncJob>("/api/sync", post()),
   sync: (id: number) => request<SyncJob>(`/api/sync/${id}`),
   latestSync: () => request<SyncJob | null>("/api/sync/latest"),
+  agentRuns: () => request<AgentRun[]>("/api/agent/runs"),
+  startAgentRun: () => request<AgentRun>("/api/agent/runs", post()),
+  agentProposals: (status: Proposal["status"]) =>
+    request<Proposal[]>(`/api/agent/proposals${qs({ status })}`),
+  approveProposal: (id: number) => request<Proposal>(`/api/agent/proposals/${id}/approve`, post()),
+  rejectProposal: (id: number) => request<Proposal>(`/api/agent/proposals/${id}/reject`, post()),
 };
 
 export function newIdempotencyKey(): string {

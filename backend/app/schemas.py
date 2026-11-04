@@ -142,3 +142,59 @@ class SyncJobOut(BaseModel):
 class HealthOut(BaseModel):
     status: Literal["ok"]
     database: Literal["ok"]
+
+
+AgentRunStatusCode = Literal["queued", "running", "succeeded", "failed", "budget_exhausted"]
+ProposalStatusCode = Literal["pending", "approved", "rejected"]
+
+
+class AgentEventOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    step: int
+    kind: Literal["step_started", "step_done", "llm_call", "budget_stop", "error", "resumed"]
+    message: str
+    tokens: int
+    created_at: datetime
+
+
+class AgentRunOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    kind: Literal["weekly_insights"]
+    status: AgentRunStatusCode
+    period_from: datetime
+    period_to: datetime
+    steps_done: int
+    max_steps: int
+    tokens_used: int
+    token_budget: int
+    error: str | None
+    created_at: datetime
+    started_at: datetime | None
+    finished_at: datetime | None
+
+
+class AgentRunDetailOut(AgentRunOut):
+    events: list[AgentEventOut]
+
+
+class EvidenceOut(BaseModel):
+    cases: int = Field(description="Сколько обращений относится к теме")
+    feedback_ids: list[int] = Field(description="Номера отзывов и вопросов (первые 50)")
+    message_ids: list[int] = Field(description="Номера сообщений покупателей в чатах (первые 50)")
+
+
+class ProposalOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    run_id: int
+    theme_key: str
+    kind: Literal["reply_template", "card_edit"]
+    title: str
+    body: str
+    evidence: EvidenceOut
+    status: ProposalStatusCode
+    decided_by: int | None
+    decided_at: datetime | None
+    created_at: datetime

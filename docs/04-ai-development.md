@@ -64,6 +64,26 @@ flowchart LR
 [test_mock_marketplace.py](../backend/tests/unit/test_mock_marketplace.py),
 [review-findings.test.tsx](../frontend/src/__tests__/review-findings.test.tsx).
 
+## Ревью, круг 3: агент-маркетолог
+
+Модуль агента писал Claude Code по брифу, ревьюил Codex до первого коммита модуля. 9 находок,
+по каждой сначала тест, потом фикс.
+
+| Находка | Подтверждено | Тест |
+|---|---|---|
+| A-01. Телефон с точками или скобками уходил в модель без маски | да | `test_phone_in_any_format_*` |
+| A-02. Ответ модели, потерянный при падении, не списывался из бюджета | да | `test_lost_response_is_charged_by_reservation_*` |
+| A-03. Временная ошибка модели убивала прогон, новый прогон повторял сделанное | да | `test_transient_provider_error_resumes_same_run` |
+| A-04. `POST /api/agent/runs` не мог возобновить брошенный прогон | да | `test_api_start_resumes_run_with_expired_lease` |
+| A-05. Фоновая задача из API могла создать второй прогон | да | `test_run_with_id_only_claims_that_run_*` |
+| A-06. Одна ошибка опроса навсегда останавливала обновление вкладки | да | Vitest «одна ошибка 503 не останавливает опрос» |
+| A-07. Одновременное одобрение одинаковых шаблонов давало ложный 409 | да, двумя сессиями | `test_concurrent_approval_of_same_template_*` |
+| A-08. Тест возобновления не проверял защиту от дублей | тест слабый; новый красный без `ON CONFLICT` | `test_repeated_propose_step_*` |
+| A-09. Тест переменных шаблона ничего не проверял | тест слабый | `test_stub_templates_use_only_known_variables` |
+
+Тесты: [test_agent.py](../backend/tests/integration/test_agent.py), [test_pii.py](../backend/tests/unit/test_pii.py),
+[agent-page.test.tsx](../frontend/src/__tests__/agent-page.test.tsx).
+
 ## Что вынес
 
 Тесты, которые писал агент по моему брифу, проверяли только то, что я придумал; ревьюер нашёл потерянное подтверждение, перезапуск

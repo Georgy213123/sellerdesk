@@ -7,6 +7,7 @@ from typing import Any
 import anthropic
 
 from app.llm import Draft, DraftRequest, DraftUnavailable
+from app.llm.pii import mask_pii
 
 log = logging.getLogger(__name__)
 
@@ -17,16 +18,21 @@ SYSTEM_PROMPT = (
 )
 MAX_DRAFT_CHARS = 1000
 
-_EMAIL = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
-_PHONE = re.compile(r"(?<![\w])(?:\+7|8)[\s\-(]*\d{3}[\s\-)]*\d{3}[\s\-]*\d{2}[\s\-]*\d{2}(?!\d)")
-_LONG_NUMBER = re.compile(r"(?<!\d)\d{8,}(?!\d)")
 
-
-def mask_pii(text: str) -> str:
-    """Заменяет e-mail, телефоны и длинные номера (заказы) до отправки модели."""
-    text = _EMAIL.sub("[email]", text)
-    text = _PHONE.sub("[телефон]", text)
-    return _LONG_NUMBER.sub("[номер]", text)
+def failure_reason(exc: anthropic.APIError) -> str:
+    """Короткая причина сбоя Claude API для оператора. Тело ошибки и ключ в неё не попадают."""
+    if isinstance(exc, anthropic.AuthenticationError):
+        return "ключ не принят"
+    if isinstance(exc, anthropic.RateLimitError):
+        return "лимит"
+    if isinstance(exc, anthropic.APITimeoutError):
+        return "таймаут"
+    if isinstance(exc, anthropic.APIConnectionError):
+        return "нет связи"
+    if isinstance(exc, anthropic.APIStatusError):
+        log.warning("anthropic: статус %s", exc.status_code)
+        return f"ошибка {exc.status_code}"
+    return "ошибка API"
 
 
 # Приветствие с именем подставляем сами: имя в модель не уходит, поэтому её «Здравствуйте» убираем.
@@ -61,17 +67,8 @@ class AnthropicProvider:
                 system=SYSTEM_PROMPT,
                 messages=[{"role": "user", "content": self._context(request)}],
             )
-        except anthropic.AuthenticationError as exc:
-            raise DraftUnavailable("ключ не принят") from exc
-        except anthropic.RateLimitError as exc:
-            raise DraftUnavailable("лимит") from exc
-        except anthropic.APITimeoutError as exc:
-            raise DraftUnavailable("таймаут") from exc
-        except anthropic.APIConnectionError as exc:
-            raise DraftUnavailable("нет связи") from exc
-        except anthropic.APIStatusError as exc:
-            log.warning("anthropic: статус %s", exc.status_code)
-            raise DraftUnavailable(f"ошибка {exc.status_code}") from exc
+        except anthropic.APIError as exc:
+            raise DraftUnavailable(failure_reason(exc)) from exc
 
         if response.stop_reason == "refusal":
             raise DraftUnavailable("модель отказалась")

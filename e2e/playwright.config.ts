@@ -41,7 +41,8 @@ export default defineConfig({
           command:
             "cd ../backend && uv run python -m app.cli ensure-db && uv run python -m app.cli reset && uv run uvicorn app.main:app --host 127.0.0.1 --port 8101",
           url: "http://127.0.0.1:8101/api/health",
-          env: { DATABASE_URL, MOCK_MARKETPLACE_DELAY_MS: "300" },
+          // У демо-данных фиксированные даты, поэтому окно разбора агента 90 дней, а не неделя.
+          env: { DATABASE_URL, MOCK_MARKETPLACE_DELAY_MS: "300", AGENT_PERIOD_DAYS: "90" },
           reuseExistingServer: !process.env.CI,
           timeout: 120_000,
         },

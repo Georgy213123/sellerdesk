@@ -1,0 +1,11 @@
+[Unit]
+Description=SellerDesk: запускать разбор обращений раз в неделю
+
+[Timer]
+OnCalendar=Mon 06:00
+RandomizedDelaySec=10min
+# Если сервер был выключен в понедельник, разбор запустится при следующей загрузке.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

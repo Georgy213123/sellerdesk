@@ -10,7 +10,8 @@ from pydantic import ValidationError
 
 from app.config import Settings
 from app.llm import DraftRequest, DraftUnavailable, StubLLMProvider, get_llm_provider
-from app.llm.anthropic_provider import AnthropicProvider, mask_pii
+from app.llm.anthropic_provider import AnthropicProvider
+from app.llm.pii import mask_pii
 
 REQ = httpx2.Request("POST", "https://api.anthropic.com/v1/messages")
 

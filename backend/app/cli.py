@@ -1,4 +1,4 @@
-"""Служебные команды: `python -m app.cli migrate|seed|sync|reset|openapi`."""
+"""Служебные команды: `python -m app.cli migrate|seed|sync|reset|openapi|agent run`."""
 
 import argparse
 import sys
@@ -11,12 +11,14 @@ from sqlalchemy import create_engine, select, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
+from app.agent import run_agent
 from app.catalog import CATALOG
 from app.config import get_settings
 from app.db import get_engine, get_sessionmaker
 from app.db_guard import require_disposable_database
+from app.llm.insights import get_insights_provider
 from app.marketplaces import get_clients
-from app.models import Operator, Product, ReplyTemplate
+from app.models import AgentKind, AgentRunStatus, Operator, Product, ReplyTemplate
 from app.security import hash_password
 from app.sync import sync_all
 
@@ -100,6 +102,17 @@ def ensure_database() -> None:
     admin.dispose()
 
 
+def agent_run() -> int:
+    """Один прогон агента (запускается по таймеру). Код выхода: 0 — готово, 2 — бюджет исчерпан, 1 — ошибка."""
+    settings = get_settings()
+    status = run_agent(get_sessionmaker(), AgentKind.WEEKLY_INSIGHTS, get_insights_provider(settings), settings)
+    if status is None:
+        print("agent: не запущен (выключен или прогон ведёт другой процесс)")
+        return 0
+    print(f"agent: {status}")
+    return {AgentRunStatus.SUCCEEDED: 0, AgentRunStatus.BUDGET_EXHAUSTED: 2}.get(status, 1)
+
+
 def openapi_yaml() -> str:
     from app.main import create_app
 
@@ -108,8 +121,15 @@ def openapi_yaml() -> str:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="app.cli")
-    parser.add_argument("command", choices=["migrate", "seed", "sync", "reset", "ensure-db", "bootstrap", "openapi"])
+    parser.add_argument(
+        "command", choices=["migrate", "seed", "sync", "reset", "ensure-db", "bootstrap", "openapi", "agent"]
+    )
+    parser.add_argument("action", nargs="?", choices=["run"], help="для agent: run")
     args = parser.parse_args(argv)
+    if args.command == "agent":
+        if args.action != "run":
+            parser.error("agent: нужно действие run")
+        return agent_run()
     if args.command == "migrate":
         migrate()
     elif args.command == "seed":

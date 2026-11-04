@@ -7,6 +7,7 @@ from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError
 
 from app import replies
+from app.api.agent import router as agent_router
 from app.api.deps import OperatorDep, SessionDep
 from app.db import get_sessionmaker
 from app.llm import DraftUnavailable, get_llm_provider
@@ -415,4 +416,5 @@ def get_sync(job_id: int, session: SessionDep, _: OperatorDep) -> SyncJobOut:
     return SyncJobOut.model_validate(job)
 
 
+protected.include_router(agent_router)
 router.include_router(protected)

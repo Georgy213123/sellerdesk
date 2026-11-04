@@ -12,6 +12,10 @@ export DATABASE_URL
 E2E_DATABASE_URL ?= postgresql+psycopg://sellerdesk:sellerdesk@localhost:55101/sellerdesk_e2e
 export E2E_DATABASE_URL
 
+# У демо-данных фиксированные даты (конец октября 2026), поэтому окно разбора агента 90 дней, а не неделя.
+AGENT_PERIOD_DAYS ?= 90
+export AGENT_PERIOD_DAYS
+
 BACKEND := cd backend &&
 FRONTEND := cd frontend &&
 E2E := cd e2e &&
