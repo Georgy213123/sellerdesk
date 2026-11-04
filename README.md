@@ -50,7 +50,7 @@ make up                 # docker compose: postgres :55101, API :8101, фронт
 Без Docker (Python 3.12 + uv, Node 24, PostgreSQL 16 на :55101): `make install && make dev`.
 Вход на http://localhost:5101: `operator`, пароль из `DEMO_OPERATOR_PASSWORD` в `.env.example`.
 
-Проверки: `make lint test e2e`. Последний прогон: 80 pytest, 14 Vitest, 12 e2e, покрытие
+Проверки: `make lint test e2e`. Последний прогон: 80 pytest, 15 Vitest, 12 e2e, покрытие
 бэкенда 93 % — [05-testing](docs/05-testing.md).
 
 ## Как это сделано
