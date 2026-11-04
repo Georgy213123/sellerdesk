@@ -84,10 +84,14 @@ export function ChatsPage({ templates, refreshToken }: Props) {
     if (!shown) return;
     const chatId = shown.id;
     const d = await api.chatDraft(chatId);
-    await loadList();
-    if (openIdRef.current !== chatId) return; // черновик сохранён в карточке своего чата
+    if (openIdRef.current !== chatId) {
+      await loadList(); // черновик сохранён в карточке своего чата
+      return;
+    }
     setDraft({ text: d.text, note: null });
     setInfo(d.note);
+    // Сервер перевёл чат в «В работе»: перечитать и карточку, не только ленту (BUG-11).
+    await afterChange();
   }
 
   async function send(text: string, key: string) {
