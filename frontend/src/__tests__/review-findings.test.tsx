@@ -132,9 +132,9 @@ describe("CR-10: лента не обрезается первой сотней"
 describe("CR-08: активная задача при загрузке страницы опрашивается", () => {
   it("кнопка разблокируется, когда задача завершилась", async () => {
     const running: SyncJob = {
-      id: 5,
+      id: 7,
       status: "running",
-      created_at: "2026-11-03T10:00:00Z",
+      created_at: "2026-11-04T09:00:00Z",
       finished_at: null,
       chats_upserted: 0,
       messages_inserted: 0,
@@ -189,5 +189,37 @@ describe("CR-13: два submit до перерисовки — один запр
       form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
     });
     expect(onSend).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("SD-05: опрос синхронизации переживает ошибку сети", () => {
+  afterEach(() => vi.useRealTimers());
+
+  it("после отклонённого опроса показывает «нет связи» и восстанавливается", async () => {
+    vi.useFakeTimers();
+    const running: SyncJob = {
+      id: 7,
+      status: "running",
+      created_at: "2026-11-04T09:00:00Z",
+      finished_at: null,
+      chats_upserted: 0,
+      messages_inserted: 0,
+      feedback_upserted: 0,
+      error: null,
+    };
+    const done: SyncJob = { ...running, status: "done", finished_at: "2026-11-04T09:00:05Z" };
+    mocked.latestSync.mockResolvedValue(running);
+    mocked.sync.mockRejectedValueOnce(new Error("network")).mockResolvedValue(done);
+    const onDone = vi.fn();
+    render(<SyncButton onDone={onDone} />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(600);
+    });
+    expect(screen.getByTestId("sync-status")).toHaveTextContent("Нет связи, повторим");
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3100);
+    });
+    expect(onDone).toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Обновить" })).toBeEnabled();
   });
 });

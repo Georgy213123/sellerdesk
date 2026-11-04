@@ -66,6 +66,7 @@ jobs:
       CI: "1"
       DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/app
       TEST_DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/app_test
+      E2E_DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/app_e2e
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6

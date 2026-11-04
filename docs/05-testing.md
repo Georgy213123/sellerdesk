@@ -2,8 +2,8 @@
 
 ```
         e2e Playwright: 6 сценариев × 2 вьюпорта
-     интеграция pytest + PostgreSQL: 48
-  unit: pytest 60, Vitest 16
+     интеграция pytest + PostgreSQL: 58
+  unit: pytest 60, Vitest 20
 ```
 
 - **unit, бэкенд:** подстановка шаблонов, время в UTC, заглушки, провайдер Claude API на фейковом клиенте (без сети), JWT, сверка `openapi.yaml` с кодом.
@@ -29,9 +29,9 @@ macOS, Python 3.12, Node 24, PostgreSQL 16, Playwright 1.64.
 
 | Набор | Результат | Время |
 |---|---|---|
-| pytest (`make test-backend`) | 108 passed: 60 unit, 48 интеграция | 15,8 с |
-| Vitest | 16 passed | ~2 с |
-| Playwright | 12 passed | 21,7 с |
+| pytest (`make test-backend`) | 118 passed: 60 unit, 58 интеграция | 17,9 с |
+| Vitest | 20 passed | ~2 с |
+| Playwright | 12 passed | 21,4 с |
 
-Покрытие бэкенда 93 %; ниже всего `app/cli.py` (57 %) и каркасы адаптеров (71 %).
+Покрытие бэкенда 93 %; ниже всего `app/cli.py` (56 %) и каркасы адаптеров (71 %).
 Тесты багов и находок ревью падали до исправления.

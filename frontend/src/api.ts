@@ -92,15 +92,19 @@ export class ApiError extends Error {
 
 const TOKEN_KEY = "sellerdesk.token";
 
+// Копия в памяти: если sessionStorage недоступен (приватный режим, запрет в политике), вход живёт до перезагрузки.
+let memoryToken: string | null = null;
+
 export function getToken(): string | null {
   try {
-    return sessionStorage.getItem(TOKEN_KEY);
+    return sessionStorage.getItem(TOKEN_KEY) ?? memoryToken;
   } catch {
-    return null;
+    return memoryToken;
   }
 }
 
 export function setToken(token: string | null): void {
+  memoryToken = token;
   try {
     if (token) sessionStorage.setItem(TOKEN_KEY, token);
     else sessionStorage.removeItem(TOKEN_KEY);

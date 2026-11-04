@@ -88,6 +88,21 @@ def send_chat_reply(
     message = session.get(Message, reserved)
     if message is None:  # строка зарезервирована в этой же транзакции
         raise RuntimeError("зарезервированное сообщение пропало")
+    imported = session.execute(
+        select(Message).where(Message.chat_id == chat_id, Message.external_id == sent.external_id)
+    ).scalar_one_or_none()
+    if imported is not None:
+        # Прошлая попытка потеряла подтверждение, резерв откатился, а синхронизация уже импортировала
+        # принятое площадкой сообщение (BUG-14). Отправка состоялась: привязываем ключ к этой строке.
+        session.delete(message)
+        session.flush()
+        imported.idempotency_key = idempotency_key
+        chat.status = ChatStatus.ANSWERED
+        chat.last_message_at = max(chat.last_message_at, imported.created_at)
+        chat.draft_text = None
+        chat.draft_note = None
+        session.commit()
+        return SendResult(imported, duplicate=True)
     message.external_id = sent.external_id
     message.created_at = sent.created_at
     chat.status = ChatStatus.ANSWERED
@@ -193,6 +208,9 @@ def template_reply_feedback(
 
 
 def ai_draft_chat(session: Session, llm: LLMProvider, chat: Chat) -> tuple[str, str]:
+    """Черновик пишется, только если чат не менялся, пока считался текст (BUG-15)."""
+    started_at = chat.last_message_at
+    started_status = chat.status
     last_buyer = next((m.text for m in reversed(chat.messages) if m.author == Author.BUYER), "")
     draft = llm.draft_reply(
         DraftRequest(
@@ -203,10 +221,16 @@ def ai_draft_chat(session: Session, llm: LLMProvider, chat: Chat) -> tuple[str, 
             last_buyer_text=last_buyer,
         )
     )
-    chat.draft_text = draft.text
-    chat.draft_note = None
-    if chat.status == ChatStatus.NEW:
-        chat.status = ChatStatus.IN_PROGRESS
+    new_status = ChatStatus.IN_PROGRESS if started_status == ChatStatus.NEW else started_status
+    updated = session.execute(
+        update(Chat)
+        .where(Chat.id == chat.id, Chat.last_message_at == started_at, Chat.status == started_status)
+        .values(draft_text=draft.text, draft_note=None, status=new_status)
+        .returning(Chat.id)
+    ).scalar_one_or_none()
+    if updated is None:
+        session.rollback()
+        raise ConflictError("чат изменился, черновик устарел")
     session.commit()
     return draft.text, draft.provider
 

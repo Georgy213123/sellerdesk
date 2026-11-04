@@ -1,9 +1,10 @@
 import { defineConfig, devices } from "@playwright/test";
 
-// Стенд: свой PostgreSQL по DATABASE_URL, API :8101, фронт :5101.
+// Стенд: своя база `*_e2e` (E2E_DATABASE_URL), API :8101, фронт :5101. `reset` стирает схему,
+// поэтому рабочий DATABASE_URL сюда не попадает.
 // Если стенд уже поднят (`make up` или `make dev`), Playwright его переиспользует.
 const DATABASE_URL =
-  process.env.DATABASE_URL ?? "postgresql+psycopg://sellerdesk:sellerdesk@localhost:55101/sellerdesk";
+  process.env.E2E_DATABASE_URL ?? "postgresql+psycopg://sellerdesk:sellerdesk@localhost:55101/sellerdesk_e2e";
 const BASE_URL = process.env.E2E_BASE_URL ?? "http://127.0.0.1:5101";
 
 export default defineConfig({
@@ -38,7 +39,7 @@ export default defineConfig({
         {
           // Чистая демо-база и API. Задержка заглушки площадок меньше, чем в демо, но не ноль.
           command:
-            "cd ../backend && uv run python -m app.cli reset && uv run uvicorn app.main:app --host 127.0.0.1 --port 8101",
+            "cd ../backend && uv run python -m app.cli ensure-db && uv run python -m app.cli reset && uv run uvicorn app.main:app --host 127.0.0.1 --port 8101",
           url: "http://127.0.0.1:8101/api/health",
           env: { DATABASE_URL, MOCK_MARKETPLACE_DELAY_MS: "300" },
           reuseExistingServer: !process.env.CI,

@@ -183,7 +183,7 @@ def _draft_unavailable(exc: DraftUnavailable) -> HTTPException:
 @protected.post(
     "/chats/{chat_id}/ai-draft",
     response_model=DraftOut,
-    responses={**NOT_FOUND, 503: {"model": ErrorOut}},
+    responses={**NOT_FOUND, 409: {"model": ErrorOut}, 503: {"model": ErrorOut}},
     tags=["chats"],
 )
 def chat_ai_draft(chat_id: int, session: SessionDep, _: OperatorDep) -> DraftOut:
@@ -193,6 +193,8 @@ def chat_ai_draft(chat_id: int, session: SessionDep, _: OperatorDep) -> DraftOut
         text_, provider = replies.ai_draft_chat(session, get_llm_provider(), chat)
     except DraftUnavailable as exc:
         raise _draft_unavailable(exc) from exc
+    except replies.ConflictError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
     return DraftOut(text=text_, provider=provider)
 
 

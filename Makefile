@@ -8,6 +8,10 @@ export TEST_DATABASE_URL
 DATABASE_URL ?= postgresql+psycopg://sellerdesk:sellerdesk@localhost:55101/sellerdesk
 export DATABASE_URL
 
+# e2e и `app.cli reset` стирают схему, поэтому e2e идёт в отдельной базе *_e2e (создаётся сама).
+E2E_DATABASE_URL ?= postgresql+psycopg://sellerdesk:sellerdesk@localhost:55101/sellerdesk_e2e
+export E2E_DATABASE_URL
+
 BACKEND := cd backend &&
 FRONTEND := cd frontend &&
 E2E := cd e2e &&

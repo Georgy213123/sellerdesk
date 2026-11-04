@@ -7,12 +7,14 @@ from pathlib import Path
 import yaml
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import select, text
+from sqlalchemy import create_engine, select, text
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
 from app.catalog import CATALOG
 from app.config import get_settings
 from app.db import get_engine, get_sessionmaker
+from app.db_guard import require_disposable_database
 from app.marketplaces import get_clients
 from app.models import Operator, Product, ReplyTemplate
 from app.security import hash_password
@@ -76,7 +78,8 @@ def sync_now(session: Session) -> None:
 
 
 def reset() -> None:
-    """Чистая демо-база: схема с нуля, сид, одна синхронизация."""
+    """Чистая демо-база: схема с нуля, сид, одна синхронизация. Только для баз `*_test` и `*_e2e`."""
+    require_disposable_database(get_engine().url.render_as_string(hide_password=False), ("_test", "_e2e"))
     with get_engine().begin() as conn:
         conn.execute(text("DROP SCHEMA public CASCADE"))
         conn.execute(text("CREATE SCHEMA public"))
@@ -84,6 +87,17 @@ def reset() -> None:
     with get_sessionmaker()() as session:
         seed(session)
         sync_now(session)
+
+
+def ensure_database() -> None:
+    """Создаёт одноразовую базу из DATABASE_URL (`*_test` или `*_e2e`), если её ещё нет."""
+    url = make_url(get_engine().url.render_as_string(hide_password=False))
+    require_disposable_database(url.render_as_string(hide_password=False), ("_test", "_e2e"))
+    admin = create_engine(url.set(database="postgres"), isolation_level="AUTOCOMMIT")
+    with admin.connect() as conn:
+        if conn.execute(text("SELECT 1 FROM pg_database WHERE datname = :n"), {"n": url.database}).scalar() is None:
+            conn.execute(text(f'CREATE DATABASE "{url.database}"'))
+    admin.dispose()
 
 
 def openapi_yaml() -> str:
@@ -94,7 +108,7 @@ def openapi_yaml() -> str:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="app.cli")
-    parser.add_argument("command", choices=["migrate", "seed", "sync", "reset", "bootstrap", "openapi"])
+    parser.add_argument("command", choices=["migrate", "seed", "sync", "reset", "ensure-db", "bootstrap", "openapi"])
     args = parser.parse_args(argv)
     if args.command == "migrate":
         migrate()
@@ -111,6 +125,8 @@ def main(argv: list[str] | None = None) -> int:
             sync_now(s)
     elif args.command == "reset":
         reset()
+    elif args.command == "ensure-db":
+        ensure_database()
     elif args.command == "openapi":
         OPENAPI_PATH.parent.mkdir(parents=True, exist_ok=True)
         OPENAPI_PATH.write_text(openapi_yaml(), encoding="utf-8")

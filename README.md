@@ -63,7 +63,7 @@ AI-черновик по умолчанию шаблонный, без сети.
 Без Docker (Python 3.12 + uv, Node 24, PostgreSQL 16 на :55101): `make install && make dev`.
 Вход на http://localhost:5101: `operator`, пароль из `DEMO_OPERATOR_PASSWORD` в `.env.example`.
 
-Проверки: `make lint test e2e`. Последний прогон: 108 pytest, 16 Vitest, 12 e2e, покрытие
+Проверки: `make lint test e2e`. Последний прогон: 118 pytest, 20 Vitest, 12 e2e, покрытие
 бэкенда 93 % — [05-testing](docs/05-testing.md).
 
 ## Как это сделано

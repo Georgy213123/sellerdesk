@@ -5,32 +5,48 @@ import { formatTime } from "../format";
 /** «Обновить» ставит задачу синхронизации и опрашивает её статус. Площадку не ждём. */
 export function SyncButton({ onDone }: { onDone: () => void }) {
   const [job, setJob] = useState<SyncJob | null>(null);
+  const [offline, setOffline] = useState(false);
   const timer = useRef<number | undefined>(undefined);
 
-  function poll(id: number) {
+  function poll(id: number, delay = 500) {
     timer.current = window.setTimeout(async () => {
-      const j = await api.sync(id);
-      setJob(j);
-      if (j.status === "queued" || j.status === "running") poll(id);
-      else onDone();
-    }, 500);
+      try {
+        const j = await api.sync(id);
+        setOffline(false);
+        setJob(j);
+        if (j.status === "queued" || j.status === "running") poll(id);
+        else onDone();
+      } catch {
+        // Нет связи: задача на сервере живёт, опрос повторяем позже (SD-05).
+        setOffline(true);
+        poll(id, 3000);
+      }
+    }, delay);
   }
 
   useEffect(() => {
-    void api.latestSync().then((j) => {
-      setJob(j);
-      // Страницу открыли во время синхронизации — продолжаем опрос, иначе кнопка
-      // так и останется заблокированной (CR-08).
-      if (j && (j.status === "queued" || j.status === "running")) poll(j.id);
-    });
+    void api
+      .latestSync()
+      .then((j) => {
+        setJob(j);
+        // Страницу открыли во время синхронизации — продолжаем опрос, иначе кнопка
+        // так и останется заблокированной (CR-08).
+        if (j && (j.status === "queued" || j.status === "running")) poll(j.id);
+      })
+      .catch(() => setOffline(true));
     return () => window.clearTimeout(timer.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- опрос запускается один раз при монтировании
   }, []);
 
   async function start() {
-    const j = await api.startSync();
-    setJob(j);
-    poll(j.id);
+    try {
+      const j = await api.startSync();
+      setOffline(false);
+      setJob(j);
+      poll(j.id);
+    } catch {
+      setOffline(true);
+    }
   }
 
   const busy = job?.status === "queued" || job?.status === "running";
@@ -42,7 +58,8 @@ export function SyncButton({ onDone }: { onDone: () => void }) {
       <span className="muted" data-testid="sync-status">
         {job?.status === "done" && job.finished_at && `Данные на ${formatTime(job.finished_at)}`}
         {job?.status === "failed" && "Ошибка синхронизации"}
-        {busy && "Задача в очереди, лента читается из кэша"}
+        {busy && !offline && "Задача в очереди, лента читается из кэша"}
+        {offline && "Нет связи, повторим"}
       </span>
     </div>
   );
