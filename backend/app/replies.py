@@ -75,7 +75,7 @@ def send_chat_reply(
             select(Message).where(Message.chat_id == chat_id, Message.idempotency_key == idempotency_key)
         ).scalar_one()
         if existing.text != text:
-            # Ключ уже занят другим текстом: молча вернуть старый ответ значит потерять новый (CR-05).
+            # Ключ уже занят другим текстом: молча вернуть старый ответ значит потерять новый.
             raise ConflictError("этот Idempotency-Key уже использован для другого текста")
         return SendResult(existing, duplicate=True)
 

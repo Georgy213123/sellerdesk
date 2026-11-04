@@ -20,7 +20,7 @@ export function ReplyComposer({ draft, note, onSend, label = "Отправить
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Ключ привязан к тексту: повтор того же текста — тот же ключ, правка после ошибки — новый.
-  // Иначе сервер вернул бы старый ответ, а новый текст молча потерялся бы (CR-05).
+  // Иначе сервер вернул бы старый ответ, а новый текст молча потерялся бы.
   const keyRef = useRef<{ key: string; text: string } | null>(null);
   // state обновится только после перерисовки; второй клик в том же тике ловит ref
   const inFlight = useRef(false);

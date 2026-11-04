@@ -39,7 +39,7 @@ def _req(**kw: Any) -> DraftRequest:
         "product_title": "Торшер «Дуга»",
         "buyer_name": "Олег",
         "rating": None,
-        "last_buyer_text": "Заказ 123456789 не приехал, звоните +7 (901) 111-22-33 или oleg@mail.ru",
+        "last_buyer_text": "Заказ 123456789 не приехал, звоните +7 (900) 000-00-01 или oleg@example.test",
     }
     return DraftRequest(**{**base, **kw})
 
@@ -67,9 +67,9 @@ def test_draft_is_truncated():
 
 def test_pii_masked_and_name_not_sent():
     client = FakeClient(_ok())
-    AnthropicProvider(client).draft_reply(_req(last_buyer_text="Заказ 123456789, +7 901 111 22 33, a.b@mail.ru"))
+    AnthropicProvider(client).draft_reply(_req(last_buyer_text="Заказ 123456789, +7 900 000 00 01, a.b@example.test"))
     sent = str(client.calls[0])
-    for leaked in ("123456789", "901 111", "a.b@mail.ru", "Олег"):
+    for leaked in ("123456789", "900 000", "a.b@example.test", "Олег"):
         assert leaked not in sent
     for mask in ("[номер]", "[телефон]", "[email]"):
         assert mask in sent
@@ -78,8 +78,8 @@ def test_pii_masked_and_name_not_sent():
 @pytest.mark.parametrize(
     ("raw", "masked"),
     [
-        ("8 (999) 123-45-67", "[телефон]"),
-        ("+79991234567", "[телефон]"),
+        ("8 (900) 000-00-02", "[телефон]"),
+        ("+79000000003", "[телефон]"),
         ("заказ 12345678", "заказ [номер]"),
         ("заказ 1234567 и 12", "заказ 1234567 и 12"),
     ],

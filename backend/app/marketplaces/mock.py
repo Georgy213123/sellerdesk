@@ -223,7 +223,7 @@ class MockMarketplace:
 
     def send_chat_message(self, chat_external_id: str, text: str, idempotency_key: str) -> SentMessage:
         """Как API площадки с ключом идемпотентности: повтор с тем же ключом возвращает уже принятое
-        сообщение и не отправляет его второй раз (CR-01)."""
+        сообщение и не отправляет его второй раз."""
         self._wait()
         with self._lock:
             chat = next((c for c in self._chats if c.external_id == chat_external_id), None)
@@ -233,7 +233,7 @@ class MockMarketplace:
             if accepted is None:
                 now = datetime.now(UTC)
                 # Глобально уникальный id, как у площадки: счётчик в памяти после перезапуска
-                # процесса повторял уже сохранённые в БД id (CR-03).
+                # процесса повторял уже сохранённые в БД id.
                 ext = f"{self._prefix()}-out-{uuid.uuid4().hex[:12]}"
                 chat.messages.append(_RawMessage(ext, Author.OPERATOR, text, _fmt(self.code, now)))
                 self.sent_log.append((chat_external_id, text))

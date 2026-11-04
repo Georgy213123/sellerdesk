@@ -33,10 +33,10 @@ export function ChatsPage({ templates, refreshToken }: Props) {
   const [listVersion, setListVersion] = useState(0);
   const [chatVersion, setChatVersion] = useState(0);
 
-  // Ответ, пришедший после переключения чата, к открытому чату не относится (CR-02).
+  // Ответ, пришедший после переключения чата, к открытому чату не относится.
   const openIdRef = useRef<number | null>(null);
   // Ключ ответа по шаблону живёт до подтверждённого ответа сервера: повтор после сетевой ошибки
-  // идёт с тем же ключом (CR-04).
+  // идёт с тем же ключом.
   const templateKeys = useRef(new Map<string, string>());
 
   useEffect(() => {
@@ -52,7 +52,7 @@ export function ChatsPage({ templates, refreshToken }: Props) {
   }, [marketplace, status, refreshToken, listVersion]);
 
   async function loadMore() {
-    // Лента не обрезается первой страницей (CR-10).
+    // Лента не обрезается первой страницей.
     const data = await api.chats({ marketplace, status, offset: items.length });
     setItems((prev) => [...prev, ...data.items.filter((n) => !prev.some((p) => p.id === n.id))]);
     setTotal(data.total);
@@ -69,7 +69,7 @@ export function ChatsPage({ templates, refreshToken }: Props) {
     return () => {
       alive = false;
     };
-    // refreshToken: после синхронизации открытая переписка перечитывается (CR-09)
+    // refreshToken: после синхронизации открытая переписка перечитывается
   }, [openId, chatVersion, refreshToken]);
 
   const loadList = async () => setListVersion((v) => v + 1);

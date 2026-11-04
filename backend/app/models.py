@@ -149,7 +149,7 @@ class ReplyTemplate(Base):
 class SyncJob(Base):
     __tablename__ = "sync_jobs"
     __table_args__ = (
-        # Активная задача одна: параллельные «Обновить» не создают вторую (CR-06).
+        # Активная задача одна: параллельные «Обновить» не создают вторую.
         Index(
             "uq_sync_jobs_one_active",
             text("(true)"),

@@ -17,7 +17,7 @@ export function SyncButton({ onDone }: { onDone: () => void }) {
         if (j.status === "queued" || j.status === "running") poll(id);
         else onDone();
       } catch {
-        // Нет связи: задача на сервере живёт, опрос повторяем позже (SD-05).
+        // Нет связи: задача на сервере живёт, опрос повторяем позже.
         setOffline(true);
         poll(id, 3000);
       }
@@ -30,7 +30,7 @@ export function SyncButton({ onDone }: { onDone: () => void }) {
       .then((j) => {
         setJob(j);
         // Страницу открыли во время синхронизации — продолжаем опрос, иначе кнопка
-        // так и останется заблокированной (CR-08).
+        // так и останется заблокированной.
         if (j && (j.status === "queued" || j.status === "running")) poll(j.id);
       })
       .catch(() => setOffline(true));
