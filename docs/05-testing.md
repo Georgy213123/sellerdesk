@@ -21,7 +21,7 @@
 | US-04 Отзывы | `test_feedback_api.py`, `UserText.test.tsx`, e2e US-04, BUG-04 |
 | US-05 Шаблоны | `test_templating.py`, `test_templates_api.py`, `test_cr11_*`, Vitest CR-04, e2e US-05 |
 | US-06 Обновить | `test_sync.py`, `test_cr06/07_*`, `test_r2_*`, Vitest CR-08, CR-09, e2e US-06 |
-| FR-12, FR-13 Агент | `test_agent.py`, `test_agent_insights.py`, `test_pii.py`, `test_compose.py`, `agent-page.test.tsx`, e2e агента |
+| US-07 Агент (FR-12, FR-13) | `test_agent.py`, `test_agent_insights.py`, `test_pii.py`, `test_compose.py`, `agent-page.test.tsx`, e2e агента |
 | FR-09, NFR-04, NFR-05 | `test_security.py`, e2e NFR-04, `test_openapi_*`, `test_models_match_*` |
 
 ## Прогон 2026-11-04 (v0.5.0)

@@ -25,7 +25,7 @@ flowchart LR
 1. Постановка, требования, ADR — я, черновики Claude Code.
 2. Модель данных, заглушки, синхронизация, ответы, шаблоны — Claude Code; приёмка по тестам гонки и подстановки.
 3. OpenAPI, фронт, e2e — Claude Code.
-4. Ревью — Codex и повторное ревью, четыре круга; тест на находку и фикс пишет Claude Code, подтверждение падением и проверка откатом — я.
+4. Ревью — пять кругов; тест на находку и фикс пишет Claude Code, подтверждение падением и проверка откатом — я.
 
 ## Ревью, круг 1: весь кейс
 
@@ -64,7 +64,24 @@ flowchart LR
 [test_mock_marketplace.py](../backend/tests/unit/test_mock_marketplace.py),
 [review-findings.test.tsx](../frontend/src/__tests__/review-findings.test.tsx).
 
-## Ревью, круг 3: агент-маркетолог
+## Ревью, круг 3: версия с Claude API
+
+Codex, весь код версии 0.4 после подключения провайдера Claude API. 6 находок, все исправлены.
+BUG-13 закрыт двумя коммитами: на коммите с тестом `make test` красный.
+
+| Находка | Подтверждено | Тест |
+|---|---|---|
+| SD-01. `app.cli reset` стирал схему и на рабочей базе (дополнение к BUG-12) | да | `test_reset_refuses_working_database` |
+| SD-02. Текст с неподставленной `{{переменной}}` уходил покупателю (BUG-13) | да | [test_bug13_unresolved_template.py](../backend/tests/integration/test_bug13_unresolved_template.py) |
+| SD-03. Повтор ответа после синхронизации падал 500 (BUG-14) | да | `test_bug14_*` |
+| SD-04. Поздний AI-черновик возвращал отвеченный чат в работу (BUG-15) | да | `test_bug15_*` |
+| SD-05. Одна ошибка сети останавливала опрос синхронизации | да | Vitest «SD-05» |
+| SD-06. Без sessionStorage вход терялся | да | [token-storage.test.ts](../frontend/src/__tests__/token-storage.test.ts) |
+
+Тесты SD-01, SD-03, SD-04: [test_review_round3.py](../backend/tests/integration/test_review_round3.py),
+SD-05: [review-findings.test.tsx](../frontend/src/__tests__/review-findings.test.tsx).
+
+## Ревью, круг 4: агент-маркетолог
 
 Модуль агента писал Claude Code по брифу, ревьюил Codex до первого коммита модуля. 9 находок,
 по каждой сначала тест, потом фикс.
@@ -73,7 +90,7 @@ flowchart LR
 |---|---|---|
 | A-01. Телефон с точками или скобками уходил в модель без маски | да | `test_phone_in_any_format_*` |
 | A-02. Ответ модели, потерянный при падении, не списывался из бюджета | да | `test_lost_response_is_charged_by_reservation_*` |
-| A-03. Временная ошибка модели убивала прогон, новый прогон повторял сделанное | да | `test_transient_provider_error_resumes_same_run` |
+| A-03. Временная ошибка модели убивала прогон, новый прогон повторял сделанное | да | `test_transient_error_is_retried_with_pause_inside_one_launch` |
 | A-04. `POST /api/agent/runs` не мог возобновить брошенный прогон | да | `test_api_start_resumes_run_with_expired_lease` |
 | A-05. Фоновая задача из API могла создать второй прогон | да | `test_run_with_id_only_claims_that_run_*` |
 | A-06. Одна ошибка опроса навсегда останавливала обновление вкладки | да | Vitest «одна ошибка 503 не останавливает опрос» |
@@ -84,9 +101,12 @@ flowchart LR
 Тесты: [test_agent.py](../backend/tests/integration/test_agent.py), [test_pii.py](../backend/tests/unit/test_pii.py),
 [agent-page.test.tsx](../frontend/src/__tests__/agent-page.test.tsx).
 
-## Ревью, круг 4: повторное ревью агента
+## Ревью, круг 5: повторное ревью агента
 
-Повторное ревью после коммита модуля: другой ревьюер, только дифф. 11 находок, 9 исправлены, 2 отложены.
+Коды R4 остались от прежней нумерации кругов: так находки названы в коммитах.
+
+Повторное ревью после коммита модуля: отдельная сессия Claude Code без контекста разработки
+и Codex параллельно, расхождения сведены в один список. 11 находок, 9 исправлены, 2 отложены.
 Сначала красный тест, потом фикс.
 
 | Находка | Подтверждено | Тест |

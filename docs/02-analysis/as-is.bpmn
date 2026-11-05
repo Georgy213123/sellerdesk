@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="Definitions_AsIs" targetNamespace="https://example.org/sellerdesk/bpmn" exporter="handwritten" exporterVersion="1.0">
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="Definitions_AsIs" targetNamespace="https://example.org/sellerdesk/bpmn">
   <bpmn:collaboration id="Collab_AsIs">
     <bpmn:participant id="Pool_AsIs" name="Обработка обращения покупателя — как есть" processRef="Process_AsIs" />
   </bpmn:collaboration>
@@ -136,6 +136,9 @@
       <bpmndi:BPMNEdge id="F4_di" bpmnElement="F4">
         <di:waypoint x="785" y="455" />
         <di:waypoint x="870" y="455" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="800" y="437" width="30" height="14" />
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="F5_di" bpmnElement="F5">
         <di:waypoint x="930" y="495" />
@@ -144,8 +147,13 @@
         <di:waypoint x="590" y="495" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="F6_di" bpmnElement="F6">
-        <di:waypoint x="785" y="455" />
-        <di:waypoint x="1040" y="455" />
+        <di:waypoint x="760" y="430" />
+        <di:waypoint x="760" y="398" />
+        <di:waypoint x="1100" y="398" />
+        <di:waypoint x="1100" y="415" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="775" y="400" width="30" height="14" />
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="F7_di" bpmnElement="F7">
         <di:waypoint x="1160" y="455" />
